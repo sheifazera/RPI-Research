@@ -15,19 +15,39 @@ mZ = 1
  
 AR = {}
 
-Px_array=np.identity(mR).reshape(mR,mR)
-Px_array=tol*Px_array
-Px={}
+
+NR_array=np.identity(nR).reshape(nR,nR)
+NR_array=tol*NR_array
+NR={}
+for i in range(0,nR):
+    for j in range(0,nR):
+        NR[(i+1),(j+1)]=NR_array[i][j]
+
+NZ_array=np.identity(nZ).reshape(nZ,nZ)
+NZ_array=tol*NZ_array
+NZ={}
+for i in range(0,nZ):
+    for j in range(0,nZ):
+        NZ[(i+1),(j+1)]=NZ_array[i][j]
+
+
+
+
+
+
+MR_array=np.identity(mR).reshape(mR,mR)
+MR_array=tol*MR_array
+MR={}
 for i in range(0,mR):
     for j in range(0,mR):
-        Px[(i+1),(j+1)]=Px_array[i][j]
+        MR[(i+1),(j+1)]=MR_array[i][j]
 
-Py_array=np.identity(mZ).reshape(mZ,mZ)
-Py_array=tol*Py_array
-Py={}
+MZ_array=np.identity(mZ).reshape(mZ,mZ)
+MZ_array=tol*MZ_array
+MZ={}
 for i in range(0,mZ):
     for j in range(0,mZ):
-        Py[(i+1),(j+1)]=Py_array[i][j]
+        MZ[(i+1),(j+1)]=MZ_array[i][j]
 
 AZ = {}
 AZ_array=np.array([-2,1]).reshape(mU,mZ)
