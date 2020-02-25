@@ -64,3 +64,7 @@ q_array=np.array([0,0]).reshape(mu,1)
 for i in range(0,mu):
     q[i+1]=q_array[i][0]
         
+d_array=np.array([1,1]).reshape(nl,1)
+
+for i in range(0,nl):
+    d[i+1]=d_array[i][0]
