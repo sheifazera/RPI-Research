@@ -5,7 +5,7 @@ Created on Thu Feb  6 10:33:00 2020
 @author: She'ifa
 NORVEP: Besancon, et al. 2019
 """
-
+import numpy as np
 from pyomo.environ import *
 from pyomo.gdp import *
 from pyomo.mpec import *
@@ -37,7 +37,7 @@ m.nlset=RangeSet(1,nl)
 m.nuset=RangeSet(1,nu)
 m.mlset=RangeSet(1,ml)
 m.muset=RangeSet(1,mu)
-m.x=Var(m.nuset,within=NonNegativeReals)
+m.x=Var(m.nuset,within=NonNegativeReals) #Assuming X is the nonnegative orthant, could be relaxed to be all of Rn
 m.v=Var(m.nlset,within=NonNegativeReals)
 m.cx=Param(m.nuset,initialize=cx,mutable=True)
 m.cy=Param(m.nlset,initialize=cy,mutable=True)
@@ -72,7 +72,7 @@ def c2(m,i):
     value=value + sum(m.B[i,j]*m.v[j] for j in m.nlset)
     return value <= m.b[i]
 m.LL.c2=Constraint(m.mlset,rule=c2)
-
+'''
 #Highpoint Problem
 
 highpoint = TransformationFactory('pao.bilevel.highpoint')
@@ -101,11 +101,12 @@ if resultsOB.solver.termination_condition==TerminationCondition.infeasible or re
 
 m.alpha=Var(m.mlset,within=NonNegativeReals)
 m.beta=Var(within=NonNegativeReals)
-m.Verticesalpha=Parameter(Any) #(k,l) is vertex l of the k-th subproblem polyhedron
-m.Verticesbeta=Parameter(Any) 
+'''
+m.Verticesalpha=Param(Any) #(k,l) is vertex l of the k-th subproblem polyhedron
+m.Verticesbeta=Param(Any) 
 m.Adversarial=Block(m.muset)
 
-
+'''
 
 def c3(m,i,k):
     value=sum(m.B[j,i]*m.alpha[j] for j in m.mlset) + m.b[i]*m.beta
@@ -113,29 +114,53 @@ def c3(m,i,k):
     return value
 
 #Get Bd=[B^T|d] matrix for all adversarial problems using numpy
-Bd=hstack(transpose(B_array),d_array)
+'''
+Bd=np.hstack((np.transpose(B_array),d_array))
 
 for k in m.muset:
+    '''
     #Check Adversarial feasibility
     m.Adversarial[k].alpha=Variable(m.mlset,within=NonNegativeReals)
     m.Adversarial[k].beta=Variable(within=NonNegativeReals) #Scalar
     m.Adversarial[k].c3=Constraint(m.muset,rule=c3)
     results=opt.solve(m.Adversarial[k])
-    
+    '''
     
     #Get Extreme Points using CDDLIB
-    mat=cdd.Matrix(hstack((-H_array[:,k],Bd)),number_type='fraction')
+    mat=cdd.Matrix(np.hstack((-np.array(H_array[:,k-1]).reshape(nl,1),Bd)),number_type='float')
     mat.rep_type=cdd.RepType.INEQUALITY
     poly=cdd.Polyhedron(mat)
     ext=poly.get_generators()
-    (s,t)=ext.shape
+    extreme=np.array(ext)
+    print(ext)
+    (s,t)=extreme.shape
     l=1
     for i in range(0,s):
-        if ext[0,i]==1:
-            for j in m.mlset
-            m.Verticesalpha[k,l,j]=ext[i,j+1] #Vertex l of the k-th polytope
-            m.Verticesbeta[k,l]=ext[i,t-1] 
-            l=l+1
+        if extreme[0,i]==1:
+            for j in m.mlset:
+                m.Verticesalpha[k,l,j]=extreme[i,j] #Vertex l of the k-th polytope
+                m.Verticesbeta[k,l]=extreme[i,t-1] 
+                l=l+1
 
 #Extended Aggragated Near-Optimal Problem
+m.LL.deactivate()
+m.lambda=Var(m.mlset,within=Reals)
+m.sigma=Var(m.nlset,within=Reals)
 
+m.56c=Constraint(m.mlset,rule=c2)
+def d(m,j):
+    value=m.d[j]
+    value=value+sum(m.lambda*m.B[i,j] for i in m.mlset)
+    value=value-m.sigma[j]
+    return value==0
+m.56d=Constraint(m.nlset,rule=d)  #Constraint 5.6d
+
+m.CompBock=Block()
+m.CompBlock.56e=ComplementarityList(rule=(complements(m.lambda[i] >= 0,
+                                                     (sum(m.A[i,j]*m.x[j] for j in m.nuset)+sum(m.B[i,j]*m.v[j] for j in m.nlset)-m.b[i]) >=0) for i in m.mlset)
+
+m.CompBlock.56f=ComplementarityList(rule=(complements(m.sigma[j]>=0, m.v[j]>=0) for j in m.nlset)) #Check notation in paper 
+
+TransformationFactory('mpec.simple_disjunction').apply_to(m.CompBlock)
+
+#BIg DISJUNCT HERE
