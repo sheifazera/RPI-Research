@@ -13,23 +13,25 @@ yu=linspace(1,10,100);
 %yl=linspace(0,10,100);
 
 figure()
-plot(yu,-A(1,1)/A(1,2)*yu+d(1)/A(1,2),'k')
+plot(yu,-A(1,1)/A(1,2)*yu+d(1)/A(1,2),'k') % Upper level
 hold on
 grid on
 xlabel('yu')
 ylabel('yl')
-plot(yu,-A(2,1)/A(2,2)*yu+d(2)/A(2,2),'k')
+plot(yu,-A(2,1)/A(2,2)*yu+d(2)/A(2,2),'k') % Upper level
 plot(yu,-B(1,1)/B(1,2)*yu+b(1)/B(1,2),'k') % Lower level
 plot(yu,-B(2,1)/B(2,2)*yu+b(2)/B(2,2),'k') % Lower level
+xlim([0,12])
+ylim([0,12])
 %%
-plot(yu,-(A(1,1)+P(1,:)*xi1)/(A(1,2)+P(2,:)*xi1)*yu+d(1)/(A(1,2)+P(2,:)*xi1),'-m')
-plot(yu,-(A(2,1)+P(1,:)*xi1)/(A(2,2)+P(2,:)*xi1)*yu+d(2)/(A(2,2)+P(2,:)*xi1),'-c')
+plot(yu,-(B(1,1)+P(1,:)*xi1)/(B(1,2)+P(2,:)*xi1)*yu+b(1)/(B(1,2)+P(2,:)*xi1),'-m')
+plot(yu,-(B(2,1)+P(1,:)*xi1)/(B(2,2)+P(2,:)*xi1)*yu+b(2)/(B(2,2)+P(2,:)*xi1),'-c')
 
-plot(yu,-(A(1,1)+P(1,:)*xi2)/(A(1,2)+P(2,:)*xi2)*yu+d(1)/(A(1,2)+P(2,:)*xi2),'--m')
-plot(yu,-(A(2,1)+P(1,:)*xi2)/(A(2,2)+P(2,:)*xi2)*yu+d(2)/(A(2,2)+P(2,:)*xi2),'--c')
+plot(yu,-(B(1,1)+P(1,:)*xi2)/(B(1,2)+P(2,:)*xi2)*yu+b(1)/(B(1,2)+P(2,:)*xi2),'--m')
+plot(yu,-(B(2,1)+P(1,:)*xi2)/(B(2,2)+P(2,:)*xi2)*yu+b(2)/(B(2,2)+P(2,:)*xi2),'--c')
 
-plot(yu,-(A(1,1)+P(1,:)*xi1n)/(A(1,2)+P(2,:)*xi1n)*yu+d(1)/(A(1,2)+P(2,:)*xi1n),'-mo')
-plot(yu,-(A(2,1)+P(1,:)*xi1n)/(A(2,2)+P(2,:)*xi1n)*yu+d(2)/(A(2,2)+P(2,:)*xi1n),'-co')
+plot(yu,-(B(1,1)+P(1,:)*xi1n)/(B(1,2)+P(2,:)*xi1n)*yu+b(1)/(B(1,2)+P(2,:)*xi1n),'-mo')
+plot(yu,-(B(2,1)+P(1,:)*xi1n)/(B(2,2)+P(2,:)*xi1n)*yu+b(2)/(B(2,2)+P(2,:)*xi1n),'-co')
 
-plot(yu,-(A(1,1)+P(1,:)*xi2n)/(A(1,2)+P(2,:)*xi2n)*yu+d(1)/(A(1,2)+P(2,:)*xi2n),'-mx')
-plot(yu,-(A(2,1)+P(1,:)*xi2n)/(A(2,2)+P(2,:)*xi2n)*yu+d(2)/(A(2,2)+P(2,:)*xi2n),'-cx')
+plot(yu,-(B(1,1)+P(1,:)*xi2n)/(B(1,2)+P(2,:)*xi2n)*yu+b(1)/(B(1,2)+P(2,:)*xi2n),'-mx')
+plot(yu,-(B(2,1)+P(1,:)*xi2n)/(B(2,2)+P(2,:)*xi2n)*yu+b(2)/(B(2,2)+P(2,:)*xi2n),'-cx')
