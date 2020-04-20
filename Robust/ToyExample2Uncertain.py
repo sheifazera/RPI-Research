@@ -14,7 +14,8 @@ mR = 0
 mZ = 1
  
 AR = {}
-
+zx=nR
+zy=nZ
 
 NR_array=np.identity(nR).reshape(nR,nR)
 NR_array=tol*NR_array
@@ -29,10 +30,6 @@ NZ={}
 for i in range(0,nZ):
     for j in range(0,nZ):
         NZ[(i+1),(j+1)]=NZ_array[i][j]
-
-
-
-
 
 
 MR_array=np.identity(mR).reshape(mR,mR)

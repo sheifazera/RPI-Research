@@ -40,7 +40,7 @@ y is discrete (Z)
 coefficient vectors and matrices should be dictionaries (with tuples for matrices)
 variable size should be floats
 '''
-from ToyExample2 import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r, zx, zy, NZ, NR
+from ToyExample2Uncertain import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r, zx, zy, NZ, NR
 '''
 mU number of upper level constraints
 nL number of lower level constraints
@@ -149,7 +149,7 @@ Parent.Master=Block()
 Parent.Master.Y=Param(Any,within=NonNegativeIntegers,mutable=True) #Growing Parameter
 Parent.Master.xu=Var(Parent.mRset,within=NonNegativeReals,bounds=(0,M))
 Parent.Master.yu=Var(Parent.mZset,within=NonNegativeIntegers,bounds=(0,M))
-Parent.Master.w=Var(within=NonNegativeReals,bounds(0,M))
+Parent.Master.w=Var(within=NonNegativeReals,bounds=(0,M))
 Parent.Master.xl0=Var(Parent.nRset,within=NonNegativeReals,bounds=(0,M))
 Parent.Master.yl0=Var(Parent.nZset,within=NonNegativeIntegers,bounds=(0,M))
 Parent.Master.nx=Var(Parent.zxset,within=Reals,bounds=(-M,M))
@@ -168,8 +168,8 @@ Parent.Master.tautilde=Var(within=NonNegativeReals,bounds=(0,M))
 #j section
 Parent.Master.x=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
 Parent.Master.wj=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M))
-Parent.Master.nxj=Var(Any,within=Reals,bounds=(-M,M))
-Parent.Master.nyj=Var(Any,within=Reals,bounds=(-M,M))
+Parent.Master.nxj=Var(Any,within=Reals,dense=False,bounds=(-M,M))
+Parent.Master.nyj=Var(Any,within=Reals,dense=False,bounds=(-M,M))
 Parent.Master.alpha=Var(Any, within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
 Parent.Master.beta=Var(Any,within=Reals,dense=False,bounds=(-M,M))
 Parent.Master.gamma=Var(Any,within=Reals,dense=False,bounds=(-M,M))
@@ -178,7 +178,7 @@ Parent.Master.t=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growi
 Parent.Master.lam=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
 Parent.Master.mu=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M))
 Parent.Master.eta=Var(Any,within=Reals,dense=False,bounds=(-M,M))
-Parent.Master.nu=Var(Any,within=Reals,dense=False,bounds(-M,M))
+Parent.Master.nu=Var(Any,within=Reals,dense=False,bounds=(-M,M))
 
 def Master_obj(Master):
     value=(sum(Parent.cR[j]*Parent.Master.xu[j] for j in Parent.mRset)+
@@ -207,12 +207,12 @@ Parent.Master.c2=Constraint(Parent.nLset,rule=Master_c2) #(13)
 
 def Master_c2a(Master,i):
     alue=sum(Parent.NR[i,j]*Parent.Master.xl0[j] for j in Parent.nRset)
-    return value=Parent.Master.nx[i]
+    return value==Parent.Master.nx[i]
 Parent.Master.c2a=Constraint(Parent.zxset,rule=Master_c2a)
 
 def Master_c2b(Master,i):
     value=sum(Parent.NZ[i,j]*Parent.Master.yl0[j] for j in Parent.nZset)
-    return value=Parent.Master.ny[i]
+    return value==Parent.Master.ny[i]
 Parent.Master.c2b=Constraint(Parent.zyset,rule=Master_c2b)
 
 def Master_c2c(Master):
@@ -237,7 +237,7 @@ Parent.Master.c4=Constraint(Parent.nLset,rule=Master_c4) #(75a)
 
 def Master_c4a(Master,i):
     alue=sum(Parent.NR[i,j]*Parent.Master.xltilde[j] for j in Parent.nRset)
-    return value=Parent.Master.nxtilde[i]
+    return value==Parent.Master.nxtilde[i]
 Parent.Master.c4a=Constraint(Parent.zxset,rule=Master_c4a)
 
 
@@ -250,14 +250,14 @@ Parent.Master.c4c=Constraint(rule=Master_c4c)
 #Dual of lower level in terms of tilde variables
 
 def Master_c5a(Master,j):
-    value= sum(Parent.Master.alphatilde[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset)
-    value= value + sum(Parent.NR[j,i]*Parent.betatilde[i] for i in Parent.Master.zxset)
-    return value <= Parent.wR[j]
-Parent.Master.c5a=Constraint(Parent.Master.nRset,rule=Master_c5a)
+    value= sum(Parent.Master.alphatilde[i]*Parent.Master.PR[(j,i)] for i in Parent.nLset)
+    value= value + sum(Parent.NR[j,i]*Parent.betatilde[i] for i in Parent.zxset)
+    return value >= Parent.wR[j]
+Parent.Master.c5a=Constraint(Parent.nRset,rule=Master_c5a)
 
 def Master_c5b(Master):
-    value=sum(Parent.Master.alphatilde[i] for i in Parent.Master.nLset)
-    return value - Parent.Master.tautilde =0
+    value=sum(Parent.Master.alphatilde[i] for i in Parent.nLset)
+    return value - Parent.Master.tautilde ==0
 Parent.Master.c5b=Constraint(rule=Master_c5b)
 
 def Master_c5c(Master):
@@ -277,17 +277,17 @@ Parent.Master.c5d=Constraint(rule=Master_c5d)
 def Master_c5e(Master,j):
     value=-Parent.Master.wtilde*Parent.Master.betatilde[j] - Parent.Master.tautilde*Parent.Master.nxtilde[j]
     return value == Parent.zero
-Parent.Master.c5e=Constraint(Parent.Master.zxset,rule=Master_c5e)
+Parent.Master.c5e=Constraint(Parent.zxset,rule=Master_c5e)
    
 def Master_c5f(Master,j):
-    value-Parent.Master.wtilde*Parent.Master.gammatilde[j] - Parent.Master.tautilde*Parent.Master.ny[j]
+    value=Parent.Master.wtilde*Parent.Master.gammatilde[j] - Parent.Master.tautilde*Parent.Master.ny[j]
     return value == Parent.zero
-Parent.Master.c5f=Constraint(Parent.Master.zyset,rule=Master_c5f)
+Parent.Master.c5f=Constraint(Parent.zyset,rule=Master_c5f)
 
 Parent.Master.CompBlock=Block()
 Parent.Master.CompBlock.c6=ComplementarityList(rule=(complements(Parent.Master.xltilde[j] >= 0,
-                                                       sum(Parent.Master.alphatilde[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset) + sum(Parent.NR[j,i]*Parent.betatilde[i] for i in Parent.Master.zxset)-
-                                                       Parent.wR[j] >=0) for j in Parent.nRset))
+                                                       sum(Parent.Master.alphatilde[i]*Parent.Master.PR[(j,i)] for i in Parent.nLset) + sum(Parent.NR[j,i]*Parent.betatilde[i] for i in Parent.zxset)-
+                                                       Parent.wR[j] <=0) for j in Parent.nRset))
 #(76a)
 
 #(76b)
@@ -295,7 +295,7 @@ Parent.Master.CompBlock.c7=ComplementarityList(rule=(complements(Parent.Master.a
                                                        (Parent.s[j]-sum(Parent.QR[(j,i)]*Parent.Master.xu[i] for i in Parent.mRset) -
                                                        sum(Parent.QZ[(j,i)]*Parent.Master.yu[i] for i in Parent.mZset)-
                                                        sum(Parent.PR[(j,i)]*Parent.Master.xltilde[i] for i in Parent.nRset)-
-                                                       sum(Parent.PZ[(j,i)]*Parent.Master.yl0[i] for i in Parent.nZset)-Parent.wtilde)>=0) for j in Parent.nLset))
+                                                       sum(Parent.PZ[(j,i)]*Parent.Master.yl0[i] for i in Parent.nZset)-Parent.Master.wtilde)>=0) for j in Parent.nLset))
 
 TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock) #To get the complementarity not in disjunction
 
@@ -310,33 +310,63 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     Parent.Master.CompBlock2[k].c_comp=ComplementarityList()
     for i in Parent.nLset:
         r_value= (sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)-
-                  Parent.Master.t[(i,k)])
+                  Parent.Master.t[(i,k)]+Parent.Master.wj[(k)])
         l_value= (Parent.s[i]-
                   sum(Parent.QR[(i,j)]*Parent.Master.xu[j] for j in Parent.mRset)-
                   sum(Parent.QZ[(i,j)]*Parent.Master.yu[j] for j in Parent.mZset)-
                   sum(Parent.PZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset)) 
     
         Parent.Master.c_col.add(l_value-r_value >= Parent.zero)
+    for i in Parent.zxset:
+        r_value=sum(Parent.NR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)
+        Parent.Master.c_col.add(r_value==Parent.Master.nxj[(i,k)])
     
-    for i in Parent.nRset:  
+    for i in Parent.zyset:
+        r_value=sum(Parent.NZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset)
+        Parent.Master.c_col.add(r_value==Parent.Master.nyj[(i,k)])
+    
+    r_value=sum(Parent.Master.nxj[(j,k)]*Parent.Master.nxj[(j,k)] for j in Parent.zxset)
+    r_value=r_value+sum(Parent.Master.nyj[(j,k)]*Parent.Master.nyj[(j,k)] for j in Parent.zyset)
+    
+    Parent.Master.c_col.add(r_value <= Parent.Master.wj[k]*Parent.Master.wj[k])
+    #Robust up to here
+    #Optimality conditions for P9
+    for i in Parent.nRset:  #Optimality for x
         Parent.Master.c_col.add(sum(Parent.PR[(j,i)]*Parent.Master.lam[(j,k)] for j in Parent.nLset)>=Parent.zero)
-        Parent.Master.CompBlock2[k].c_comp.add(complements(Parent.Master.x[(i,k)]>=0, 
-                                                             sum(Parent.PR[(j,i)]*Parent.Master.lam[(j,k)] for j in Parent.nLset)>=0)) #(83)  
+        Parent.Master.CompBlock2[k].c_comp.add(complements(Parent.Master.x[(i,k)]>=0, sum(Parent.Master.alpha[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset) + sum(Parent.NR[j,i]*Parent.beta[i] for i in Parent.Master.zxset)-
+                                                       Parent.wR[j] <=0)) #(83) 
     
-    for i in Parent.nLset:
-        Parent.Master.c_col.add(1-Parent.Master.lam[(i,k)]>=Parent.zero)
+    for i in Parent.nLset: #optimality for t #Already robust
+        Parent.Master.c_col.add(1-Parent.Master.lam[(i,k)]>=Parent.zero) 
         Parent.Master.CompBlock2[k].c_comp.add(complements(1-Parent.Master.lam[(i,k)]>=0,Parent.Master.t[(i,k)]>=0)) #(84)
     
-    for i in Parent.nLset:
+    for i in Parent.nLset: #Robust complementarity on first primal constraint
         Parent.Master.CompBlock2[k].c_comp.add(complements(Parent.Master.lam[(i,k)]>=0,(Parent.s[i]-
                                                      sum(Parent.QR[(i,j)]*Parent.Master.xu[j] for j in Parent.mRset)-
                                                      sum(Parent.QZ[(i,j)]*Parent.Master.yu[j] for j in Parent.mZset)-
                                                      sum(Parent.PZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset)-
                                                      sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)+
-                                                     Parent.Master.t[(i,k)]>=0))) #(85)
+                                                     Parent.Master.t[(i,k)]-Parent.Master.wj[k]>=0))) #(85)
+        
+    r_value=sum(Parent.Master.alpha[(i,k)] for j in Parent.nLset)-Parent.Master.mu[k]
+    Parent.Master.c_col.add(r_value==0) #Dual on w
     
+    r_value=sum(Parent.Master.eta[(j,k)]*Parent.Master.eta[(j,k)] for j in Parent.zxset)
+    r_value=r_value+sum(Parent.Master.nu[(j,k)]*Parent.Master.nu[(j,k)] for j in Parent.zyset)
+    Parent.Master.c_col.add(r_value <= Parent.Master.mu[k] * Parent.Master.mu[k]) # Dual Cone
     
+    #Conic Complementarity
     
+    r_value=Parent.Master.mu[k]*Parent.Master.wj[k]-sum(Parent.Master.eta[(j,k)]*Parent.Master.nxj[(j,k)] for j in Parent.zxset)-sum(Parent.Master.nu[(j,k)]*Parent.Master.nyj[(j,k)] for j in Parent.zyset)
+    Parent.Master.c_col.add(r_value==0)
+    
+    for i in Parent.zxset:
+        r_value=-Parent.Master.wj[k]*Parent.eta[(i,k)] + Parent.Master.mu[k]*Parent.nxj[(i,k)]
+        Parent.Master.c_col.add(r_value==0)
+    for i in Parent.zyset:     
+        r_value=-Parent.Master.wj[k]*Parent.Master.nu[(i,k)] + Parent.Master.mu[k]*Parent.Master.nyj[(i,k)]
+        Parent.Master.c_col.add(r_value==0)
+        
     TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock2[k]) #To get the complementarity not in disjunction
     
     #(82) Disjunction
@@ -360,25 +390,61 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
                sum(Parent.QR[(i,j)]*Parent.Master.xu[j] for j in Parent.mRset)-
                sum(Parent.QZ[(i,j)]*Parent.Master.yu[j] for j in Parent.mZset)-
                sum(Parent.PZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset))
-        l_value = sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)#(82b)
+        l_value = sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)+ Parent.Master.wj[k]#(82b)
         
         Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value-l_value >= 0)
-        
+     
+    #Conic primal constraints 
+    for i in Parent.zxset:
+        r_value=sum(Parent.NR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)
+        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==Parent.nxj[(i,k)])
+    
+    for i in Parent.zyset:
+        r_value=sum(Parent.NZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset)
+        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==Parent.Master.nyj[(i,k)])
+    
+    r_value=sum(Parent.Master.nxj[(j,k)]*Parent.Master.nxj[(j,k)] for j in Parent.zxset)
+    r_value=r_value+sum(Parent.Master.nyj[(j,k)]*Parent.Master.nyj[(j,k)] for j in Parent.zyset)
+    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value<= Parent.Master.wj[k]*Parent.Master.wj[k])
+    
+    #Dual Constraints
+    
     for j in Parent.nRset:
-        value= sum(Parent.PR[(i,j)]*Parent.Master.pi[(i,k)] for i in Parent.nLset)
+        value= sum(Parent.Master.alpha[(i,k)]*Parent.PR[(i,j)] for i in Parent.nLset)
+        value= value + sum(Parent.NR[(j,i)]*Parent.Master.beta[(i,k)] for i in Parent.zxset)
         Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(value >= Parent.wR[j])#(82c1)
     
-    Parent.Master.DisjunctionBlock[k].BLOCK.comp1=ComplementarityList(rule=(complements(Parent.Master.pi[(j,k)]>=0, 
+    r_value=sum(Parent.Master.alpha[(j,k)] for j in Parent.nLset) - Parent.Master.tau[k]
+    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value == 0)
+    
+    r_value=sum(Parent.Master.beta[(j,k)]*Parent.Master.beta[(j,k)] for j in Parent.zxset)
+    r_value=r_value+sum(Parent.Master.gamma[(j,k)]*Parent.Master.gamma[(j,k)] for j in Parent.zyset)
+    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value <= Parent.Master.tau[k]*Parent.Master.tau[k])
+    
+    #Complementarity
+    Parent.Master.DisjunctionBlock[k].BLOCK.comp1=ComplementarityList(rule=(complements(Parent.Master.alpha[(j,k)]>=0, 
                                   (Parent.s[j]-
                                    sum(Parent.QR[(j,i)]*Parent.Master.xu[i] for i in Parent.mRset)-
                                    sum(Parent.QZ[(j,i)]*Parent.Master.yu[i] for i in Parent.mZset)-
                                    sum(Parent.PR[(j,i)]*Parent.Master.x[(i,k)] for i in Parent.nRset)-
-                                   sum(Parent.PZ[(j,i)]*Parent.Master.Y[(i,k)] for i in Parent.nZset))>=0) for j in Parent.nLset)) #(82d)
+                                   sum(Parent.PZ[(j,i)]*Parent.Master.Y[(i,k)] for i in Parent.nZset)-
+                                   Parent.Master.wj[k])>=0) for j in Parent.nLset)) #(82d)
     
     Parent.Master.DisjunctionBlock[k].BLOCK.comp2=ComplementarityList(rule=(complements(
             Parent.Master.x[(j,k)]>=0,
-            sum(Parent.PR[(i,j)]*Parent.Master.pi[(i,k)] for i in Parent.nLset)-Parent.wR[j]>=0) for j in Parent.nRset)) #(82c2)
+            sum(Parent.Master.alpha[(i,k)]*Parent.PR[(i,j)] for i in Parent.nLset)+sum(Parent.NR[(j,i)]*Parent.Master.beta[(i,k)] for i in Parent.zxset) -Parent.wR[j]>=0) for j in Parent.nRset)) #(82c2)
     
+    #Conic Complementarity
+    
+    r_value=Parent.Master.tau[k]*Parent.Master.wj[k]-sum(Parent.Master.nxj[(j,k)]*Parent.Master.beta[(j,k)] for j in Parent.zxset) - sum(Parent.Master.nyj[(j,k)]*Parent.Master.gamma[(j,k)] for j in Parent.zyset)
+    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+    for i in Parent.zxset:
+        r_value=-Parent.Master.wj[k]*Parent.Master.beta[(i,k)]+Parent.Master.tau[k]*Parent.Master.nxj[(i,k)]
+        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+    for i in Parent.zyset:
+        r_value=-Parent.Master.wj[k]*Parent.Master.gamma[(i,k)]+Parent.Master.tau[k]*Parent.Master.nyj[(i,k)]
+        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+        
     
     Parent.Master.DisjunctionBlock[k].c_disj=Disjunction(expr=[Parent.Master.DisjunctionBlock[k].LH, Parent.Master.DisjunctionBlock[k].BLOCK])
     
@@ -421,11 +487,11 @@ def sub1_c1(sub1,i):
 
 def sub1_c2(sub1,i):
     value=sum(Parent.NR[i,j]*Parent.sub1.xl[j] for j in Parent.nRset)
-    return value=Parent.sub1.nx[i]
+    return value==Parent.sub1.nx[i]
 
 def sub1_c3(sub1,i):
     value=sum(Parent.NZ[i,j]*Parent.sub1.yl[j] for j in Parent.nZset)
-    return value=Parent.sub1.ny[i]
+    return value==Parent.sub1.ny[i]
 
 def sub1_c4(sub1):
     value=sum(Parent.sub1.nx[j]*Parent.sub1.nx[j] for j in Parent.zxset )
