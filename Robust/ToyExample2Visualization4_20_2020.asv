@@ -1,4 +1,4 @@
-yu=linspace(0,10,100);
+yu=linspace(1,11,100);
 figure()
 plot(yu,(12+2*yu)/3,'k--')
 hold on
@@ -15,7 +15,10 @@ plot(yu,30-3*yu,'k')
 
 xlabel('yu')
 ylabel('yl')
+ylim([0 inf])
 
+xticks(0:1:11)
+yticks(0:1:30)
 grid on
 hold on
 
@@ -23,16 +26,45 @@ saveas(gcf,'ToyExample2RobustUpperLevel.jpg')
 
 %% Robust Lower Level
 
-yu=linspace(0,10,100);
+yu=linspace(0,12,100);
 figure()
+
 plot(yu,(12+2*yu)/3,'k')
 hold on
+
 plot(yu,(14-yu),'k')
 
 plot(yu,(-3+3*yu),'k--')
 plot(yu,30-3*yu,'k--')
 
-plot(yu,(-3+2.9*yu),'c')
-plot(yu,30-3*yu,'k--')
 
+
+
+plot(yu,(-3+3*yu)/0.9,'c')
+plot(yu,(30-3*yu)/0.9,'c')
+
+plot(yu,(-3+3*yu)/1.1,'m')
+plot(yu,(30-3*yu)/1.1,'m')
+
+xlabel('yu')
+ylabel('yl')
+xticks(0:1:11)
+yticks(0:1:35)
+ylim([0 inf])
+grid on
 saveas(gcf,'ToyExample2RobustLowerLevel.jpg')
+
+
+%% Two dimensional toy problem (not bilevel) 
+x=linspace(0,9,100);
+figure()
+plot(x,(30+25*x)/(20),'k')
+hold on
+plot(x,
+
+plot(x,(30+24.9*x)/(20.1))
+
+plot(x,(10-1.1*x)/(2.1))
+plot(x,(15-2.1*x)/(0.9))
+plot(x,(-15+1.9*x)/(-9.9))
+

@@ -18,14 +18,28 @@ This algorithm seeks to solve the following bilevel MILP:
      (xl0,yl0) in argmax {wR*xl+wZ*yl: PR*xl+PZ*yl<=s-QR*xu-QZ*yu}
 '''
 import time
+import sys 
 
 from pyomo.environ import *
 from pyomo.gdp import *
 from pyomo.mpec import *
 
 
+solvername='SCIPAMPL'
+
+solverpath_folder='C:\\Users\sheifazera\Documents\RPI\Research\SCIP' 
+
+solverpath_exe='C:\\Users\sheifazera\Documents\RPI\Research\SCIP\scipampl'
+
+sys.path.append(solverpath_folder)
+
+SCIP=SolverFactory(solvername,executable=solverpath_exe)
+#SCIP=SolverFactory('SCIPAMPL')
+
+
 infinity = float('inf')
-opt=SolverFactory("ipopt")
+IPOPT=SolverFactory("ipopt")
+GUROBI=SolverFactory("gurobi")
 bigm = TransformationFactory('gdp.bigm')
 
 '''
@@ -71,7 +85,7 @@ t = time.time()
 #These parameters can be changed for your specific problem
 epsilon= 1e-4 #For use in disjunction approximation
 xi=0 #tolerance for UB-LB to claim convergence
-maxit=5 #Maximum number of iterations
+maxit=1 #Maximum number of iterations
 M=1e6 #upper bound on variables
 
 LB=-infinity
@@ -168,6 +182,7 @@ Parent.Master.tautilde=Var(within=NonNegativeReals,bounds=(0,M))
 #j section
 Parent.Master.x=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
 Parent.Master.wj=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M))
+Parent.Master.s=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M))
 Parent.Master.nxj=Var(Any,within=Reals,dense=False,bounds=(-M,M))
 Parent.Master.nyj=Var(Any,within=Reals,dense=False,bounds=(-M,M))
 Parent.Master.alpha=Var(Any, within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
@@ -369,6 +384,8 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
         
     TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock2[k]) #To get the complementarity not in disjunction
     
+    
+    
     #(82) Disjunction
     Parent.Master.DisjunctionBlock[k].LH=Disjunct()
     Parent.Master.DisjunctionBlock[k].BLOCK=Disjunct()
@@ -393,25 +410,12 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
         l_value = sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)+ Parent.Master.wj[k]#(82b)
         
         Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value-l_value >= 0)
-     
-    #Conic primal constraints 
-    for i in Parent.zxset:
-        r_value=sum(Parent.NR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)
-        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==Parent.nxj[(i,k)])
-    
-    for i in Parent.zyset:
-        r_value=sum(Parent.NZ[(i,j)]*Parent.Master.Y[(j,k)] for j in Parent.nZset)
-        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==Parent.Master.nyj[(i,k)])
-    
-    r_value=sum(Parent.Master.nxj[(j,k)]*Parent.Master.nxj[(j,k)] for j in Parent.zxset)
-    r_value=r_value+sum(Parent.Master.nyj[(j,k)]*Parent.Master.nyj[(j,k)] for j in Parent.zyset)
-    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value<= Parent.Master.wj[k]*Parent.Master.wj[k])
     
     #Dual Constraints
     
     for j in Parent.nRset:
         value= sum(Parent.Master.alpha[(i,k)]*Parent.PR[(i,j)] for i in Parent.nLset)
-        value= value + sum(Parent.NR[(j,i)]*Parent.Master.beta[(i,k)] for i in Parent.zxset)
+        value= value + sum(Parent.NR[(j,i)]*Parent.Master.beta[(i,k)] for i in Parent.zxset)  + Parent.Master.s[k,i]
         Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(value >= Parent.wR[j])#(82c1)
     
     r_value=sum(Parent.Master.alpha[(j,k)] for j in Parent.nLset) - Parent.Master.tau[k]
@@ -419,7 +423,7 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     
     r_value=sum(Parent.Master.beta[(j,k)]*Parent.Master.beta[(j,k)] for j in Parent.zxset)
     r_value=r_value+sum(Parent.Master.gamma[(j,k)]*Parent.Master.gamma[(j,k)] for j in Parent.zyset)
-    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value <= Parent.Master.tau[k]*Parent.Master.tau[k])
+    Parent.Master.c_col.add(r_value <= Parent.Master.tau[k]*Parent.Master.tau[k])
     
     #Complementarity
     Parent.Master.DisjunctionBlock[k].BLOCK.comp1=ComplementarityList(rule=(complements(Parent.Master.alpha[(j,k)]>=0, 
@@ -427,29 +431,29 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
                                    sum(Parent.QR[(j,i)]*Parent.Master.xu[i] for i in Parent.mRset)-
                                    sum(Parent.QZ[(j,i)]*Parent.Master.yu[i] for i in Parent.mZset)-
                                    sum(Parent.PR[(j,i)]*Parent.Master.x[(i,k)] for i in Parent.nRset)-
-                                   sum(Parent.PZ[(j,i)]*Parent.Master.Y[(i,k)] for i in Parent.nZset)-
-                                   Parent.Master.wj[k])>=0) for j in Parent.nLset)) #(82d)
+                                   sum(Parent.PZ[(j,i)]*Parent.Master.Y[(i,k)] for i in Parent.nZset) + Parent.Master.wj[k])>=0) for j in Parent.nLset)) #(82d)
     
     Parent.Master.DisjunctionBlock[k].BLOCK.comp2=ComplementarityList(rule=(complements(
             Parent.Master.x[(j,k)]>=0,
-            sum(Parent.Master.alpha[(i,k)]*Parent.PR[(i,j)] for i in Parent.nLset)+sum(Parent.NR[(j,i)]*Parent.Master.beta[(i,k)] for i in Parent.zxset) -Parent.wR[j]>=0) for j in Parent.nRset)) #(82c2)
+            Parent.s[(j,k)]>=0) for j in Parent.nRset)) #(82c2)
     
     #Conic Complementarity
     
     r_value=Parent.Master.tau[k]*Parent.Master.wj[k]-sum(Parent.Master.nxj[(j,k)]*Parent.Master.beta[(j,k)] for j in Parent.zxset) - sum(Parent.Master.nyj[(j,k)]*Parent.Master.gamma[(j,k)] for j in Parent.zyset)
-    Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+    Parent.Master.c_col.add(r_value==0)
     for i in Parent.zxset:
         r_value=-Parent.Master.wj[k]*Parent.Master.beta[(i,k)]+Parent.Master.tau[k]*Parent.Master.nxj[(i,k)]
-        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+        Parent.Master.c_col.add(r_value==0)
     for i in Parent.zyset:
         r_value=-Parent.Master.wj[k]*Parent.Master.gamma[(i,k)]+Parent.Master.tau[k]*Parent.Master.nyj[(i,k)]
-        Parent.Master.DisjunctionBlock[k].BLOCK.cons.add(r_value==0)
+        Parent.Master.c_col.add(r_value==0)
         
     
     Parent.Master.DisjunctionBlock[k].c_disj=Disjunction(expr=[Parent.Master.DisjunctionBlock[k].LH, Parent.Master.DisjunctionBlock[k].BLOCK])
-    
+    Parent.Master.pprint()
     TransformationFactory('mpec.simple_disjunction').apply_to(
         Parent.Master.DisjunctionBlock[k].BLOCK) #to get the complementarity in the disjunction
+    
     return Parent
 
 #Create parameters that will be updated on each iteration, initialized with coefficient vector of same size 
@@ -566,8 +570,10 @@ while UB-LB > xi and k < maxit:
     #Step 1: Initialization (done)
     #Step 2: Solve the Master Problem
     bigm.apply_to(Parent.Master) 
-    opt.solve(Parent.Master)
-
+    #Parent.Master.Y.pprint()
+    SCIP.solve(Parent.Master)
+    if k > 1:
+        print(f'{sum(Parent.Master.t[(j,k)].value for j in Parent.nLset)}')
     for i in range(1,mR+1):
         Parent.xu_star[i]=Parent.Master.xu[i].value    
     for i in range(1,mZ+1):
@@ -579,6 +585,8 @@ while UB-LB > xi and k < maxit:
 
     LB=value(Parent.Master.Theta_star) 
     print(f'Iteration {k}: Master Obj={LB}')
+    print(f'yu={Parent.Master.yu[1].value}')
+    print(f'yu={Parent.Master.yl0[1].value}')
     #Step 3: Terminate?
     if UB-LB <= xi: #Output
         elapsed = time.time() - t
@@ -587,7 +595,7 @@ while UB-LB > xi and k < maxit:
         break
     #Step 4: Solve first subproblem
 
-    results1=opt.solve(Parent.sub1) 
+    results1=GUROBI.solve(Parent.sub1) 
     
     if results1.solver.termination_condition !=TerminationCondition.optimal:
         raise RuntimeError("ERROR! ERROR! Subproblem 1: Could not find optimal solution")
@@ -600,8 +608,7 @@ while UB-LB > xi and k < maxit:
 
     
     #Step 5: Solve second subproblem
-    results=opt.solve(Parent.sub2)
-    
+    results=GUROBI.solve(Parent.sub2)
     if results.solver.termination_condition==TerminationCondition.optimal: #If Optimal
         for i in range(1,nR+1):
             Parent.xl_star[i]=Parent.sub2.xl[i].value

@@ -33,7 +33,7 @@ y is discrete (Z)
 coefficient vectors and matrices should be dictionaries (with tuples for matrices)
 variable size should be floats
 '''
-from ToyExample2Uncertain import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r, Px, Py
+from ToyExample2Uncertain import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r, Px, Py, zxu, zyu
 '''
 mU number of upper level constraints
 nL number of lower level constraints
@@ -89,6 +89,8 @@ Parent.nRset=RangeSet(1,nR)
 Parent.nZset=RangeSet(1,nZ)
 Parent.mRset=RangeSet(1,mR)
 Parent.mZset=RangeSet(1,mZ)
+Parent.zxset=RangeSet(1,zxu)
+Parent.zyset=RangeSet(1,zyu)
 
 Parent.s=Param(Parent.nLset,initialize=s,default=0,mutable=True)
 Parent.r=Param(Parent.mUset,initialize=r,default=0,mutable=True)
@@ -155,10 +157,10 @@ Parent.Master.t=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growi
 Parent.Master.lam=Var(Any,within=NonNegativeReals,dense=False,bounds=(0,M)) #Growing variable
 
 Parent.Master.v=Var(within=NonNegativeReals,bounds=(0,M))
-Parent.Px=Param(Parent.mRset,Parent.mRset,initialize=Px,default=0,mutable=True)
-Parent.Py=Param(Parent.mZset,Parent.mZset,initialize=Py,default=0,mutable=True)
-Parent.Master.PX=Var(Parent.mRset,within=NonNegativeReals,bounds=(0,M))
-Parent.Master.PY=Var(Parent.mZset,within=NonNegativeReals,bounds=(0,M))
+Parent.Px=Param(Parent.zxset,Parent.mRset,initialize=Px,default=0,mutable=True)
+Parent.Py=Param(Parent.zyset,Parent.mZset,initialize=Py,default=0,mutable=True)
+Parent.Master.PX=Var(Parent.zxset,within=NonNegativeReals,bounds=(0,M))
+Parent.Master.PY=Var(Parent.zyset,within=NonNegativeReals,bounds=(0,M))
 
 def Master_obj(Master):
     value=(sum(Parent.cR[j]*Parent.Master.xu[j] for j in Parent.mRset)+
@@ -218,8 +220,8 @@ def Master_cR1b(Master,j):
 Parent.Master.cR1b=Constraint(Parent.mZset,rule=Master_cR1b)
 
 def Master_cR2(Master):
-    value=(sum(Parent.Master.PX[i]*Parent.Master.PX[i] for i in Parent.mRset)+
-           sum(Parent.Master.PY[i]*Parent.Master.PY[i] for i in Parent.mZset))
+    value=(sum(Parent.Master.PX[i]*Parent.Master.PX[i] for i in Parent.zxset)+
+           sum(Parent.Master.PY[i]*Parent.Master.PY[i] for i in Parent.zyset))
     return value <=Parent.Master.v*Parent.Master.v
 Parent.Master.cR2=Constraint(rule=Master_cR2)
 
@@ -342,6 +344,10 @@ Parent.xu_star=Param(Parent.mRset,initialize=cR,default=0,mutable=True)
 Parent.xl0_star=Param(Parent.nRset,initialize=wR,default=0,mutable=True)
 Parent.yu_star=Param(Parent.mZset,initialize=cZ,default=0,mutable=True)
 Parent.yl0_star=Param(Parent.nZset,initialize=wZ,default=0,mutable=True)
+Parent.v_star=Param(initialize=0,default=0,mutable=True)
+Parent.mx_star=Param(Parent.zxset,default=0,mutable=True)
+Parent.mz_star=Param(Parent.zyset,default=0,mutable=True)
+
 theta=0
 Parent.theta=Param(initialize=theta,mutable=True)
 
@@ -421,31 +427,12 @@ Parent.sub2.c1=Constraint(Parent.nLset,rule=sub2_c1) #(56)
 Parent.sub2.c2=Constraint(Parent.mUset,rule=sub2_c2) #(59)
 Parent.sub2.c3=Constraint(rule=sub2_c3)
 
-Parent.sub2.v=Var(within=NonNegativeReals,bounds=(0,M))
-Parent.sub2.PX=Var(Parent.mRset,within=NonNegativeReals,bounds=(0,M))
-Parent.sub2.PY=Var(Parent.mZset,within=NonNegativeReals,bounds=(0,M))
-
 # Robust Conic Constraints
-def sub2_cR1(sub2,j):
-    value=sum(Parent.Px[i,j]*Parent.xu_star[i] for i in Parent.mRset)
-    return value==Parent.sub2.PX[j]
-Parent.sub2.cR1=Constraint(Parent.mRset,rule=sub2_cR1)
-
-def sub2_cR1b(sub2,j):
-    value=sum(Parent.Py[i,j]*Parent.yu_star[i] for i in Parent.mZset)
-    return value==Parent.sub2.PY[j]
-Parent.sub2.cR1b=Constraint(Parent.mZset,rule=sub2_cR1b)
-
-def sub2_cR2(sub2):
-    value=(sum(Parent.sub2.PX[i]*Parent.sub2.PX[i] for i in Parent.mRset)+
-           sum(Parent.sub2.PY[i]*Parent.sub2.PY[i] for i in Parent.mZset))
-    return value <=Parent.sub2.v*Parent.sub2.v
-Parent.sub2.cR2=Constraint(rule=sub2_cR2)
 
 def sub2_cR3(sub2,j):
     value=(sum(Parent.AR[j,i]*Parent.xu_star[i] for i in Parent.mRset)+
           sum(Parent.AZ[j,i]*Parent.yu_star[i] for i in Parent.mZset)+
-          Parent.sub2.v+
+          Parent.v_star+
           sum(Parent.BR[(j,i)]*Parent.sub2.xl[i] for i in Parent.nRset)+
           sum(Parent.BZ[(j,i)]*Parent.sub2.yl[i] for i in Parent.nZset))
     return value - Parent.r[j] <= Parent.zero
@@ -476,7 +463,8 @@ while UB-LB > xi and k < maxit:
         Parent.xl0_star[i]=Parent.Master.xl0[i].value
     for i in range(1,nZ+1):
         Parent.yl0_star[i]=Parent.Master.yl0[i].value
-
+    Parent.v_star=Parent.Master.v.value
+        
     LB=value(Parent.Master.Theta_star) 
     print(f'Iteration {k}: Master Obj={LB}')
     print(f'yu={Parent.Master.yu[1].value},yl={Parent.Master.yl0[1].value}')
@@ -518,6 +506,7 @@ while UB-LB > xi and k < maxit:
         UB=min(UB,value(UBnew(Parent)))
         
     elif results.solver.termination_condition==TerminationCondition.infeasible or results.solver.termination_condition==TerminationCondition.infeasibleOrUnbounded: #If infeasible
+        print(f'Subproblem 2 infeasible for yu_star={Parent.yu_star[1].value},v_star={Parent.v_star.value}')
         for i in range(1,nZ+1):
             Parent.yl_arc[i]=Parent.yl_hat[i]  
     else: 
@@ -541,4 +530,4 @@ elif k< maxit and flag !=1:
     print(f'Optimal Solution Found in {k-1} iterations and {elapsed} seconds: Obj={UB}')
     print(f'yu={Parent.Master.yu[1].value},yl={Parent.sub2.yl[1].value}')
     print(f'PY={Parent.Master.PY[1].value}')
-    print(f'v={Parent.sub2.v.value}')
+    #print(f'v={Parent.sub2.v.value}')

@@ -17,6 +17,9 @@ AR = {}
 zx=nR
 zy=nZ
 
+zxu=mR
+zyu=mZ
+
 NR_array=np.identity(nR).reshape(nR,nR)
 NR_array=tol*NR_array
 NR={}
@@ -38,6 +41,7 @@ MR={}
 for i in range(0,mR):
     for j in range(0,mR):
         MR[(i+1),(j+1)]=MR_array[i][j]
+Px=MR
 
 MZ_array=np.identity(mZ).reshape(mZ,mZ)
 MZ_array=tol*MZ_array
@@ -45,6 +49,7 @@ MZ={}
 for i in range(0,mZ):
     for j in range(0,mZ):
         MZ[(i+1),(j+1)]=MZ_array[i][j]
+Py=MZ
 
 AZ = {}
 AZ_array=np.array([-2,1]).reshape(mU,mZ)
