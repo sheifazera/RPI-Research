@@ -27,9 +27,9 @@ from pyomo.mpec import *
 
 solvername='SCIPAMPL'
 
-solverpath_folder='C:\\Users\sheifazera\Documents\RPI\Research\SCIP' 
+solverpath_folder='C:\\Users\spunlag\Documents\SCIP' 
 
-solverpath_exe='C:\\Users\sheifazera\Documents\RPI\Research\SCIP\scipampl'
+solverpath_exe='C:\\Users\spunlag\Documents\SCIP\scipampl'
 
 sys.path.append(solverpath_folder)
 
@@ -85,7 +85,7 @@ t = time.time()
 #These parameters can be changed for your specific problem
 epsilon= 1e-4 #For use in disjunction approximation
 xi=0 #tolerance for UB-LB to claim convergence
-maxit=1 #Maximum number of iterations
+maxit=5 #Maximum number of iterations
 M=1e6 #upper bound on variables
 
 LB=-infinity
@@ -312,7 +312,6 @@ Parent.Master.CompBlock.c7=ComplementarityList(rule=(complements(Parent.Master.a
                                                        sum(Parent.PR[(j,i)]*Parent.Master.xltilde[i] for i in Parent.nRset)-
                                                        sum(Parent.PZ[(j,i)]*Parent.Master.yl0[i] for i in Parent.nZset)-Parent.Master.wtilde)>=0) for j in Parent.nLset))
 
-TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock) #To get the complementarity not in disjunction
 
 Parent.Master.c_col = ConstraintList()
 Parent.Master.CompBlock2=Block(Any)
@@ -325,7 +324,7 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     Parent.Master.CompBlock2[k].c_comp=ComplementarityList()
     for i in Parent.nLset:
         r_value= (sum(Parent.PR[(i,j)]*Parent.Master.x[(j,k)] for j in Parent.nRset)-
-                  Parent.Master.t[(i,k)]+Parent.Master.wj[(k)])
+                  Parent.Master.t[(i,k)]+Parent.Master.wj[k])
         l_value= (Parent.s[i]-
                   sum(Parent.QR[(i,j)]*Parent.Master.xu[j] for j in Parent.mRset)-
                   sum(Parent.QZ[(i,j)]*Parent.Master.yu[j] for j in Parent.mZset)-
@@ -344,13 +343,13 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     r_value=r_value+sum(Parent.Master.nyj[(j,k)]*Parent.Master.nyj[(j,k)] for j in Parent.zyset)
     
     Parent.Master.c_col.add(r_value <= Parent.Master.wj[k]*Parent.Master.wj[k])
-    #Robust up to here
+    
     #Optimality conditions for P9
     for i in Parent.nRset:  #Optimality for x
-        Parent.Master.c_col.add(sum(Parent.PR[(j,i)]*Parent.Master.lam[(j,k)] for j in Parent.nLset)>=Parent.zero)
-        Parent.Master.CompBlock2[k].c_comp.add(complements(Parent.Master.x[(i,k)]>=0, sum(Parent.Master.alpha[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset) + sum(Parent.NR[j,i]*Parent.beta[i] for i in Parent.Master.zxset)-
-                                                       Parent.wR[j] <=0)) #(83) 
-    
+        Parent.Master.c_col.add(sum(Parent.Master.lam[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset) + sum(Parent.NR[j,i]*Parent.eta[i] for i in Parent.Master.zxset)<= Paremt.zero)
+        Parent.Master.CompBlock2[k].c_comp.add(complements(Parent.Master.x[(i,k)]>=0, sum(Parent.Master.lam[i]*Parent.Master.PR[(j,i)] for i in Parent.Master.nLset) + sum(Parent.NR[j,i]*Parent.eta[i] for i in Parent.Master.zxset)>= 0))
+                                                        #(83) 
+     
     for i in Parent.nLset: #optimality for t #Already robust
         Parent.Master.c_col.add(1-Parent.Master.lam[(i,k)]>=Parent.zero) 
         Parent.Master.CompBlock2[k].c_comp.add(complements(1-Parent.Master.lam[(i,k)]>=0,Parent.Master.t[(i,k)]>=0)) #(84)
@@ -382,7 +381,7 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
         r_value=-Parent.Master.wj[k]*Parent.Master.nu[(i,k)] + Parent.Master.mu[k]*Parent.Master.nyj[(i,k)]
         Parent.Master.c_col.add(r_value==0)
         
-    TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock2[k]) #To get the complementarity not in disjunction
+    
     
     
     
@@ -450,9 +449,7 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
         
     
     Parent.Master.DisjunctionBlock[k].c_disj=Disjunction(expr=[Parent.Master.DisjunctionBlock[k].LH, Parent.Master.DisjunctionBlock[k].BLOCK])
-    Parent.Master.pprint()
-    TransformationFactory('mpec.simple_disjunction').apply_to(
-        Parent.Master.DisjunctionBlock[k].BLOCK) #to get the complementarity in the disjunction
+    #Parent.Master.pprint()
     
     return Parent
 
@@ -568,12 +565,13 @@ def UBnew(Parent):
 #Iteration
 while UB-LB > xi and k < maxit:
     #Step 1: Initialization (done)
-    #Step 2: Solve the Master Problem
+    #Step 2: Solve the Master Problem 
+    TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master)
     bigm.apply_to(Parent.Master) 
     #Parent.Master.Y.pprint()
     SCIP.solve(Parent.Master)
     if k > 1:
-        print(f'{sum(Parent.Master.t[(j,k)].value for j in Parent.nLset)}')
+        print(f'sum of t ={sum(Parent.Master.t[(j,k)].value for j in Parent.nLset)}')
     for i in range(1,mR+1):
         Parent.xu_star[i]=Parent.Master.xu[i].value    
     for i in range(1,mZ+1):
@@ -586,7 +584,7 @@ while UB-LB > xi and k < maxit:
     LB=value(Parent.Master.Theta_star) 
     print(f'Iteration {k}: Master Obj={LB}')
     print(f'yu={Parent.Master.yu[1].value}')
-    print(f'yu={Parent.Master.yl0[1].value}')
+    print(f'yl={Parent.Master.yl0[1].value}')
     #Step 3: Terminate?
     if UB-LB <= xi: #Output
         elapsed = time.time() - t
@@ -600,6 +598,7 @@ while UB-LB > xi and k < maxit:
     if results1.solver.termination_condition !=TerminationCondition.optimal:
         raise RuntimeError("ERROR! ERROR! Subproblem 1: Could not find optimal solution")
     Parent.theta=value(Parent.sub1.theta)
+    print(f'theta={value(Parent.theta)}')
 
     for i in range(1,nR+1):
         Parent.xl_hat[i]=Parent.sub1.xl[i].value 

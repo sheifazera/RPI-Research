@@ -211,7 +211,7 @@ Parent.Master.CompBlock.c7=ComplementarityList(rule=(complements(Parent.Master.p
                                                        sum(Parent.PR[(j,i)]*Parent.Master.xltilde[i] for i in Parent.nRset)-
                                                        sum(Parent.PZ[(j,i)]*Parent.Master.yl0[i] for i in Parent.nZset))>=0) for j in Parent.nLset))
 
-TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock) #To get the complementarity not in disjunction
+#TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock) #To get the complementarity not in disjunction
 
 
 Parent.Master.c_col = ConstraintList()
@@ -252,7 +252,7 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     
     
     
-    TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock2[k]) #To get the complementarity not in disjunction
+    #TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master.CompBlock2[k]) #To get the complementarity not in disjunction
     
     #(82) Disjunction
     Parent.Master.DisjunctionBlock[k].LH=Disjunct()
@@ -297,8 +297,8 @@ def Master_add(Parent,k): #function for adding constraints on each iteration
     
     Parent.Master.DisjunctionBlock[k].c_disj=Disjunction(expr=[Parent.Master.DisjunctionBlock[k].LH, Parent.Master.DisjunctionBlock[k].BLOCK])
     
-    TransformationFactory('mpec.simple_disjunction').apply_to(
-        Parent.Master.DisjunctionBlock[k].BLOCK) #to get the complementarity in the disjunction
+    #TransformationFactory('mpec.simple_disjunction').apply_to(
+    #    Parent.Master.DisjunctionBlock[k].BLOCK) #to get the complementarity in the disjunction
     return Parent
 
 #Create parameters that will be updated on each iteration, initialized with coefficient vector of same size 
@@ -309,13 +309,13 @@ Parent.yl0_star=Param(Parent.nZset,initialize=wZ,default=0,mutable=True)
 theta=0
 Parent.theta=Param(initialize=theta,mutable=True)
 
-Parent.xl_hat=Param(Parent.nRset,initialize=wR,within=NonNegativeReals,default=0,mutable=True)
-Parent.yl_hat=Param(Parent.nZset,initialize=wZ,within=NonNegativeIntegers,default=0,mutable=True)
+Parent.xl_hat=Param(Parent.nRset,initialize=0,within=NonNegativeReals,default=0,mutable=True)
+Parent.yl_hat=Param(Parent.nZset,initialize=0,within=NonNegativeIntegers,default=0,mutable=True)
 
-Parent.yl_star=Param(Parent.nZset, initialize=wZ,within=NonNegativeIntegers,default=0,mutable=True) 
-Parent.xl_star=Param(Parent.nRset, initialize=wR,within=NonNegativeReals,default=0,mutable=True)
+Parent.yl_star=Param(Parent.nZset, initialize=0,within=NonNegativeIntegers,default=0,mutable=True) 
+Parent.xl_star=Param(Parent.nRset, initialize=0,within=NonNegativeReals,default=0,mutable=True)
 Parent.Theta_0=Param(initialize=0,mutable=True)
-Parent.yl_arc=Param(Parent.nZset, initialize=wZ,within=NonNegativeIntegers,default=0,mutable=True)
+Parent.yl_arc=Param(Parent.nZset, initialize=0,within=NonNegativeIntegers,default=0,mutable=True)
 
 
 ''' Subproblem 1
@@ -396,6 +396,7 @@ def UBnew(Parent):
 while UB-LB > xi and k < maxit:
     #Step 1: Initialization (done)
     #Step 2: Solve the Master Problem
+    TransformationFactory('mpec.simple_disjunction').apply_to(Parent.Master)
     bigm.apply_to(Parent.Master) 
     opt.solve(Parent.Master)
 
@@ -457,6 +458,11 @@ while UB-LB > xi and k < maxit:
     
     Master_add(Parent,k)
     #Step 7: Loop 
+    #print(f'yu={Parent.Master.yu[1].value}')
+    #print(f'xu={Parent.Master.xu[1].value}')
+    #print(f'yl0={Parent.sub1.yl[1].value}')
+    #print(f'xl0={Parent.sub1.xl[1].value}')
+    
 
 
 #Output Information regarding objective and time/iterations to convergence    
