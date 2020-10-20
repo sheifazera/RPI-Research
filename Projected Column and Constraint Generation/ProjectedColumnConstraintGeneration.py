@@ -33,7 +33,7 @@ y is discrete (Z)
 coefficient vectors and matrices should be dictionaries (with tuples for matrices)
 variable size should be floats
 '''
-from ToyExample2 import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r
+from ToyExample1 import mU, nL, nR, nZ, mR, mZ, AR, AZ, BR, BZ, cR, cZ, dR, dZ, PR, PZ, s, QR, QZ, wR, wZ, r
 '''
 mU number of upper level constraints
 nL number of lower level constraints
