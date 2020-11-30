@@ -130,8 +130,57 @@ M_RIU.d.pprint()
 M_RIU.u.pprint()
 
 
+# %% 
+s=0
+t=3
+opt=SolverFactory('gurobi')
+N={0,1,2,3}
+B=2
+D={(0,1):(2,3) , (0,2): (3,1), (1,3): (3,4), (2,3): (3,2)}
 
+vdim=2
+R={(0,1,0): 1 , (0,1,1): 0 , (0,2,0): 0, (0,2,1): 2, (1,3,0): 3, (1,3 ,1): 0, (2,3,0): 0, (2,3 ,1): 3}
 
+M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
+results=opt.solve(M,tee=True)
+print('Asymmetric Uncertainty Interdiction Results')
+print('Interdiction Variable')
+M.x.pprint()
+print('Evader Path Variable')
+M.w.pprint()
+M.z.pprint()
+print('Uncertainty Variable')
+M.t.pprint()
+path=return_path_asymmetric(M,D,N,s,t)
+print(path)
 
+# %%
+s=0
+t=3
+N={0,1,2,3}
+B=4
+Prob={(0,1):(0.8,0.6),(0,2):(0.9,0.6), (1,3):(0.5,0.4), (2,3): (0.3,0.1)}
+D={}
+for (i,j) in Prob.keys():
+    (p,q)=Prob[(i,j)]
+    D[(i,j)]=(-np.log(p),-np.log(q)+np.log(p))
+
+vdim=2
+R={(0,1,0):0.29, (0,1,1): 0, (0,2,0):0, (0,2,1):.4, (1,3,0):0.22, (1,3,1):0, (2,3,0):0, (2,3,1):1.09}
+M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
+opt=SolverFactory('gurobi')
+results=opt.solve(M)
+print('Asymmetric Uncertainty Interdiction Results')
+print('Interdiction Variable')
+M.x.pprint()
+print('Evader Path Variable')
+M.w.pprint()
+M.z.pprint()
+print('Uncertainty Variable')
+M.t.pprint()
+path=return_path_asymmetric(M,D,N,s,t)
+print(path)
+print(f'Objective={value(M.Obj)}')
+print(f'd_t={M.d[t].value}')
 
 

@@ -118,4 +118,186 @@ print(path_interdiction_uncertain)
 
 
 
+# %% Asymmetric Uncertainty  
 
+
+D = {(int(a),int(b)) : (c, c) for a,b,c in matrix}
+B = 20
+vdim=len(D)
+R={}
+for (i,j) in D.keys():
+    (l,r)=D[(i,j)]
+    k=0
+    for (u,v) in D.keys():
+        if i==u and j==v:
+            R[(i,j,k)]=r
+        else:
+            R[(i,j,k)]=0
+        k=k+1
+
+s=3
+t=20
+
+M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
+opt=SolverFactory('gurobi')
+results=opt.solve(M)
+print('Asymmetric Uncertainty Interdiction Results')
+print('Interdiction Variable')
+M.x.pprint()
+print('Evader Path Variable')
+M.w.pprint()
+M.z.pprint()
+print('Uncertainty Variable')
+M.t.pprint()
+path=return_path_asymmetric(M,D,N,s,t)
+print(path)
+print(f'Objective={value(M.Obj)}')
+print(f'd_t={M.d[t].value}')
+
+
+# %% Probability-based Sioux Falls
+Prob = {(int(a),int(b)) : c for a,b,c in matrix}
+for (i,j) in Prob.keys():
+    if Prob[(i,j)] ==10:
+        Prob[(i,j)] = (0.1,0.05) #p_ij, q_ij 
+    elif Prob[(i,j)] ==9 :
+        Prob[(i,j)] = (0.2, 0.1)
+    elif Prob[(i,j)] ==8 :  
+        Prob[(i,j)] = (0.3,0.15)
+    elif Prob[(i,j)] ==7 :  
+        Prob[(i,j)] = (0.4,0.2)
+    elif Prob[(i,j)] ==6 :  
+        Prob[(i,j)] = (0.5, 0.25)
+    elif Prob[(i,j)] ==5 :  
+        Prob[(i,j)] = (0.6, 0.3)
+    elif Prob[(i,j)] ==4 :  
+        Prob[(i,j)] = (0.7, 0.35)
+    elif Prob[(i,j)] ==3 :  
+        Prob[(i,j)] = (0.8, 0.4)
+    elif Prob[(i,j)] ==2 :  
+        Prob[(i,j)] = (0.9, 0.45)    
+    else:
+        raise Exception('Original Sioux Falls value out of range 2-10')
+
+
+
+#Add the super source   100     
+N.add(100)
+N_external={1,2,3,7,12,13,18,20,21,24}
+for i in N_external:
+    Prob[(i,100)]=(1,1)
+    Prob[(100,i)]=(1,1)
+
+
+s=100
+t=10
+#Convert to lengths using \ell_ij=-\ln(p_ij)
+D={}
+for (i,j) in Prob.keys():
+    (p,q)=Prob[(i,j)]
+    D[(i,j)]=(-np.log(p),-np.log(q)+np.log(p))
+    
+B=5  
+M=create_shortest_path_interdiction(D,N,s,t, B)   
+opt=SolverFactory('gurobi')
+results=opt.solve(M) 
+path=return_path_interdiction(M,D,N,s,t,opt)    
+print('Interdiction')
+print('Interdiction Variable')
+M.x.pprint()
+M.d.pprint()
+print(path)
+print(f'Probability of Evasion={exp(-M.d[t].value)}')    
+
+
+# %% Robust Super Source Sioux Falls
+
+#Uncertainty
+'''
+vdim=len(D)
+R={}
+for (i,j) in D.keys():
+    (l,r)=D[(i,j)]
+    k=0
+    for (u,v) in D.keys():
+        if i==u and j==v:
+            R[(i,j,k)]=r
+        else:
+            R[(i,j,k)]=0
+        k=k+1
+'''
+vdim=0
+R={}
+B=5
+M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
+opt=SolverFactory('gurobi')
+results=opt.solve(M)
+print('Asymmetric Uncertainty Interdiction Results')
+print('Interdiction Variable')
+M.x.pprint()
+print('Evader Path Variable')
+M.w.pprint()
+M.z.pprint()
+#print('Uncertainty Variable')
+#M.t.pprint()
+path=return_path_asymmetric(M,D,N,s,t)
+print(path)
+print(f'Objective={value(M.Obj)}')
+print(f'Nominal Probability of Evasion={exp(-M.d[t].value)}')      
+
+# %% Multiple (S,T) Pairs
+Prob = {(int(a),int(b)) : c for a,b,c in matrix}
+for (i,j) in Prob.keys():
+    if Prob[(i,j)] ==10:
+        Prob[(i,j)] = (0.1,0.05) #p_ij, q_ij 
+    elif Prob[(i,j)] ==9 :
+        Prob[(i,j)] = (0.2, 0.1)
+    elif Prob[(i,j)] ==8 :  
+        Prob[(i,j)] = (0.3,0.15)
+    elif Prob[(i,j)] ==7 :  
+        Prob[(i,j)] = (0.4,0.2)
+    elif Prob[(i,j)] ==6 :  
+        Prob[(i,j)] = (0.5, 0.25)
+    elif Prob[(i,j)] ==5 :  
+        Prob[(i,j)] = (0.6, 0.3)
+    elif Prob[(i,j)] ==4 :  
+        Prob[(i,j)] = (0.7, 0.35)
+    elif Prob[(i,j)] ==3 :  
+        Prob[(i,j)] = (0.8, 0.4)
+    elif Prob[(i,j)] ==2 :  
+        Prob[(i,j)] = (0.9, 0.45)    
+    else:
+        raise Exception('Original Sioux Falls value out of range 2-10')
+   
+N_external={1,2,3,7,12,13,18,20,21,24}
+t=10
+I=set()
+for i in N_external:
+    I.add((i,t))
+
+#Convert to lengths using \ell_ij=-\ln(p_ij)
+D={}
+for (i,j) in Prob.keys():
+    (p,q)=Prob[(i,j)]
+    D[(i,j)]=(-np.log(p),-np.log(q)+np.log(p))
+    
+B=5  
+vdim=0
+R={}
+M=create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B)
+opt=SolverFactory('gurobi')
+results=opt.solve(M) 
+#path=return_path_interdiction(M,D,N,s,t,opt)    
+print('Interdiction')
+print('Interdiction Variable')
+M.x.pprint()
+#print(path)
+for (S,T) in I:
+    print(f'Probability of Evasion on ({S},{T})={exp(-M.d[t].value)}')    
+
+
+
+# %% Robust Probability-based Sioux Falls 
+    
+
+        

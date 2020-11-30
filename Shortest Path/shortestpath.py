@@ -56,7 +56,7 @@ def create_shortest_path_interdiction(D,N,s,t, B): #D={(u,v):(l,r)}
         raise Exception('{s} is not in the provided set of nodes')
     if t not in N:
         raise Exception('{t} is not in the provided set of nodes') 
-    M.d=Var(N,within=PositiveReals) #distance from s to a node
+    M.d=Var(N,within=NonNegativeReals) #distance from s to a node
     M.x=Var(D.keys(),within=Binary) #whether or not an edge is interdicted
     
     M.Obj=Objective(expr=M.d[t], sense=maximize)
@@ -307,8 +307,8 @@ def return_path_interdiction_robust_uncertain(M,D,N,P,R,s,t,udim,vdim,opt):
 
 def create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B):
     M=ConcreteModel()
-    if len(D.keys())*udim != len(P):
-        raise Exception('P is not appropriately dimensioned')
+    if len(D.keys())*vdim != len(R):
+        raise Exception('R is not appropriately dimensioned')
     #Check if s and t are in the set of nodes
     if s not in N:
         raise Exception('{s} is not in the provided set of nodes')
@@ -319,7 +319,7 @@ def create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B):
     M.budget=Constraint(expr = sum(M.x[(u,v)] for (u,v) in D.keys()) <= B)
     M.V=RangeSet(1,vdim)
     M.v=Var(M.V,within=Reals)
-    M.t=Var(D.keys(),within=Reals)
+    M.t=Var(M.V,within=Reals)
     M.w=Var(D.keys(),within=NonNegativeReals)
     M.z=Var(D.keys(),within=NonNegativeReals)
     M.s=Var(within=NonNegativeReals)
@@ -329,20 +329,21 @@ def create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B):
         for (i,j) in D.keys():
             (l,r)=D[(i,j)]
             value=value + l*M.z[(i,j)] + (l+r)*M.w[(i,j)]
-        value=value -s
+        value=value -M.s
         return value
     M.Obj=Objective(rule=Obj,sense=maximize)
     
     
     def C(M,i,j):
         (l,r)=D[(i,j)]
-        return M.d[j] <= M.d[i] + l + M.t[(i,j)] + r*M.x[(i,j)]
+        return M.d[j] <= M.d[i] + l + r*M.x[(i,j)]
     M.c=Constraint(D.keys(),rule=C) #Distance-based shortest path
     M.c0=Constraint(expr = M.d[s]==0) #Distance-based shortest path
-    def C1(M,k):
-        value=R[(i,j,k-1)]*M.w[(i,j)]
-    return M.t[k]==value()
+    def c1(M,k):
+        value=sum(R[(i,j,k-1)]*M.w[(i,j)] for (i,j) in D.keys())
+        return M.t[k]==value
     M.c1=Constraint(M.V, rule=c1) # R^Tw=t
+    
     M.c2=Constraint(expr= sum(M.t[i]*M.t[i] for i in M.V)<= M.s*M.s) # t^T t <= s^2
     def c3(M,i,j):
         return M.z[(i,j)] + M.x[(i,j)] <=1 
@@ -358,19 +359,19 @@ def create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B):
         return M.d[t]==value
     M.c5=Constraint(rule=c5)
     
-    def c6(M,I):
-        if I==s:
+    def c6(M,J):
+        if J==s:
             rhs=1
-        elif I==t:
+        elif J==t:
             rhs=-1
         else:
             rhs=0
         RS=0
         FS=0
         for (i,j) in D.keys():
-            if i==I:
+            if j==J:
                 RS= RS + M.w[(i,j)] + M.z[(i,j)]
-            elif j==I:
+            elif i==J:
                 FS= FS + M.w[(i,j)] + M.z[(i,j)]
         return FS-RS == rhs 
     M.c6=Constraint(N,rule=c6)
@@ -378,9 +379,103 @@ def create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B):
     return M
 
 
+def return_path_asymmetric(M,D,N,s,t):
+    tol=1/max(N)
+    N_in_path=[s]
+    n=s
+    nold=infty
+    while (n != t):
+        if n==nold: #If we went through the loop without finding an adjacent node
+            raise Exception('False path: no adjacent node has positive dual value!')
+        for j in N-set(N_in_path): 
+            if (n,j) in D.keys():
+                if M.z[(n,j)].value >tol or M.w[(n,j)].value >tol:
+                    N_in_path.append(j)
+                    nold=n
+                    n=j
+                    break   
+    return N_in_path
 
 
 
+
+
+#WIP
+ 
+def create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B):
+    M=ConcreteModel()
+    if len(D.keys())*vdim != len(R):
+        raise Exception('R is not appropriately dimensioned')   
+    M.x=Var(D.keys(),within=Binary) #whether or not an edge is interdicted
+    M.budget=Constraint(expr = sum(M.x[(i,j)] for (i,j) in D.keys()) <= B)
+    M.V=RangeSet(1,vdim)
+    M.m=Var(within=Reals)
+    
+    M.Obj=Objective(expr=M.m, sense=maximize)
+    
+    M.STBlocks=Block(I)
+    
+    #Loop for all possible (S,T) pairs
+    for (S,T) in I:  
+        M.STBlocks[(S,T)].d=Var(N,within=PositiveReals)
+        M.STBlocks[(S,T)].t=Var(M.V,within=Reals)
+        M.STBlocks[(S,T)].w=Var(D.keys(),within=NonNegativeReals)
+        M.STBlocks[(S,T)].z=Var(D.keys(),within=NonNegativeReals)
+        M.STBlocks[(S,T)].s=Var(within=NonNegativeReals)
+    #Constraint Rules Here
+        def C(M,i,j):
+            (l,r)=D[(i,j)]
+            return M.d[j] <= M.d[i] + l + r*M.x[(i,j)]
+        def c1(M,k):
+            value=sum(R[(i,j,k-1)]*M.w[(S,T),(i,j)] for (i,j) in D.keys())
+            return M.t[S,T,k]==value
+        def c3(M,i,j):
+            return M.z[(S,T),(i,j)] + M.x[(i,j)] <=1 
+        def c4(M,i,j):
+            return M.w[(S,T),(i,j)] - M.x[(i,j)] <= 0
+        def c5(M):
+            value=0
+            for (i,j) in D.keys():
+                (l,r)=D[(i,j)]
+                value=value+ l*M.z[(S,T),(i,j)] + (l+r)*M.w[(S,T),(i,j)]
+            return M.d[(S,T),T]==value
+        def c6(M,J):
+            if J==S:
+                rhs=1
+            elif J==T:
+                rhs=-1
+            else:
+                rhs=0
+            RS=0
+            FS=0
+            for (i,j) in D.keys():
+                if j==J:
+                    RS= RS + M.w[(S,T),(i,j)] + M.z[(S,T),(i,j)]
+                elif i==J:
+                    FS= FS + M.w[(S,T),(i,j)] + M.z[(S,T),(i,j)]
+            return FS-RS == rhs 
+        
+        def c7(M):
+            value=0
+            for (i,j) in D.keys():
+                (l,r)=D[(i,j)]
+                value=value + l*M.z[(S,T),(i,j)] + (l+r)*M.w[(S,T),(i,j)]
+            value=value -M.s[(S,T)]
+            
+            return value >= M.m
+    
+
+        M.STBlocks[(S,T)].c=Constraint(D.keys(),rule=C) #Distance-based shortest path
+        M.STBlocks[(S,T)].c0=Constraint(expr = M.d[(S,T),S]==0) #Distance-based shortest path
+        M.STBlocks[(S,T)].c1=Constraint(M.V, rule=c1) # R^Tw=t
+        M.STBlocks[(S,T)].c2=Constraint(expr= sum(M.t[(S,T),i]*M.t[(S,T),i] for i in M.V)<= M.s[(S,T)]*M.s[(S,T)]) # t^T t <= s^2
+        M.STBlocks[(S,T)].c3=Constraint(D.keys(),rule=c3) #zk + xk <= 1
+        M.STBlocks[(S,T)].c4=Constraint(D.keys(),rule=c4) #wk - xk <= 0
+        M.STBlocks[(S,T)].c5=Constraint(rule=c5)
+        M.STBlocks[(S,T)].c6=Constraint(N,rule=c6)
+        M.STBlocks[(S,T)].c7=Constraint(rule=c7)
+ 
+    return M
 
 
 
