@@ -213,21 +213,25 @@ print(f'Probability of Evasion={exp(-M.d[t].value)}')
 # %% Robust Super Source Sioux Falls
 
 #Uncertainty
-'''
+
 vdim=len(D)
+#vdim=0
 R={}
+
 for (i,j) in D.keys():
     (l,r)=D[(i,j)]
     k=0
     for (u,v) in D.keys():
         if i==u and j==v:
-            R[(i,j,k)]=r
+            if i==100 or j==100:
+                R[(i,j,k)]=0 #The arcs from super source shouldn't be variable
+            else:
+                R[(i,j,k)]=r
         else:
             R[(i,j,k)]=0
         k=k+1
-'''
-vdim=0
-R={}
+
+
 B=5
 M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
 opt=SolverFactory('gurobi')
@@ -282,8 +286,23 @@ for (i,j) in Prob.keys():
     D[(i,j)]=(-np.log(p),-np.log(q)+np.log(p))
     
 B=5  
-vdim=0
+vdim=len(D)
+#vdim=0
 R={}
+
+for (i,j) in D.keys():
+    (l,r)=D[(i,j)]
+    k=0
+    for (u,v) in D.keys():
+        if i==u and j==v:
+            if i==100 or j==100:
+                R[(i,j,k)]=0 #The arcs from super source shouldn't be variable
+            else:
+                R[(i,j,k)]=r
+        else:
+            R[(i,j,k)]=0
+        k=k+1
+
 M=create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B)
 opt=SolverFactory('gurobi')
 results=opt.solve(M) 
@@ -293,7 +312,9 @@ print('Interdiction Variable')
 M.x.pprint()
 #print(path)
 for (S,T) in I:
-    print(f'Probability of Evasion on ({S},{T})={exp(-M.d[t].value)}')    
+    path=return_path_asymmetric_multiple_ST(M,D,N,S,T)
+    print(f'Probability of Evasion on ({S},{T})={exp(-M.STBlocks[(S,T)].d[T].value)}')    
+    print(path)
 
 
 

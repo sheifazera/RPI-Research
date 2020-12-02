@@ -397,10 +397,25 @@ def return_path_asymmetric(M,D,N,s,t):
     return N_in_path
 
 
+def return_path_asymmetric_multiple_ST(M,D,N,s,t):
+    tol=1/max(N)
+    N_in_path=[s]
+    n=s
+    nold=infty
+    while (n != t):
+        if n==nold: #If we went through the loop without finding an adjacent node
+            raise Exception('False path: no adjacent node has positive dual value!')
+        for j in N-set(N_in_path): 
+            if (n,j) in D.keys():
+                if M.STBlocks[(s,t)].z[(n,j)].value >tol or M.STBlocks[(s,t)].w[(n,j)].value >tol:
+                    N_in_path.append(j)
+                    nold=n
+                    n=j
+                    break   
+    return N_in_path
 
 
 
-#WIP
  
 def create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B):
     M=ConcreteModel()
@@ -422,24 +437,29 @@ def create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I
         M.STBlocks[(S,T)].w=Var(D.keys(),within=NonNegativeReals)
         M.STBlocks[(S,T)].z=Var(D.keys(),within=NonNegativeReals)
         M.STBlocks[(S,T)].s=Var(within=NonNegativeReals)
-    #Constraint Rules Here
-        def C(M,i,j):
+    #Constraints
+        M.STBlocks[(S,T)].C=ConstraintList()
+        for (i,j) in D.keys():
             (l,r)=D[(i,j)]
-            return M.d[j] <= M.d[i] + l + r*M.x[(i,j)]
-        def c1(M,k):
-            value=sum(R[(i,j,k-1)]*M.w[(S,T),(i,j)] for (i,j) in D.keys())
-            return M.t[S,T,k]==value
-        def c3(M,i,j):
-            return M.z[(S,T),(i,j)] + M.x[(i,j)] <=1 
-        def c4(M,i,j):
-            return M.w[(S,T),(i,j)] - M.x[(i,j)] <= 0
-        def c5(M):
-            value=0
-            for (i,j) in D.keys():
-                (l,r)=D[(i,j)]
-                value=value+ l*M.z[(S,T),(i,j)] + (l+r)*M.w[(S,T),(i,j)]
-            return M.d[(S,T),T]==value
-        def c6(M,J):
+            M.STBlocks[(S,T)].C.add(M.STBlocks[(S,T)].d[j] <= M.STBlocks[(S,T)].d[i] + l + r*M.x[(i,j)])
+        M.STBlocks[(S,T)].c0=Constraint(expr = M.STBlocks[(S,T)].d[S]==0)
+        M.STBlocks[(S,T)].c1=ConstraintList()
+        for k in M.V:
+            M.STBlocks[(S,T)].c1.add(M.STBlocks[(S,T)].t[k]==sum(R[(i,j,k-1)]*M.STBlocks[(S,T)].w[(i,j)] for (i,j) in D.keys()))
+        M.STBlocks[(S,T)].c2=Constraint(expr=sum(M.STBlocks[(S,T)].t[i]*M.STBlocks[(S,T)].t[i] for i in M.V)<= M.STBlocks[(S,T)].s*M.STBlocks[(S,T)].s)
+        M.STBlocks[(S,T)].c3=ConstraintList()
+        for (i,j) in D.keys():
+            M.STBlocks[(S,T)].c3.add(M.STBlocks[(S,T)].z[(i,j)] + M.x[(i,j)] <=1 )
+        M.STBlocks[(S,T)].c4=ConstraintList()
+        for (i,j) in D.keys():
+            M.STBlocks[(S,T)].c4.add(M.STBlocks[(S,T)].w[(i,j)] - M.x[(i,j)] <= 0)
+        value=0
+        for (i,j) in D.keys():
+            (l,r)=D[(i,j)]
+            value=value+ l*M.STBlocks[(S,T)].z[(i,j)] + (l+r)*M.STBlocks[(S,T)].w[(i,j)]
+        M.STBlocks[(S,T)].c5=Constraint(expr=M.STBlocks[(S,T)].d[T]==value)
+        M.STBlocks[(S,T)].c6=ConstraintList()
+        for J in N:
             if J==S:
                 rhs=1
             elif J==T:
@@ -450,30 +470,19 @@ def create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I
             FS=0
             for (i,j) in D.keys():
                 if j==J:
-                    RS= RS + M.w[(S,T),(i,j)] + M.z[(S,T),(i,j)]
+                    RS= RS + M.STBlocks[(S,T)].w[(i,j)] + M.STBlocks[(S,T)].z[(i,j)]
                 elif i==J:
-                    FS= FS + M.w[(S,T),(i,j)] + M.z[(S,T),(i,j)]
-            return FS-RS == rhs 
+                    FS= FS + M.STBlocks[(S,T)].w[(i,j)] + M.STBlocks[(S,T)].z[(i,j)]
+                    
+            M.STBlocks[(S,T)].c6.add(FS-RS == rhs )        
         
-        def c7(M):
-            value=0
-            for (i,j) in D.keys():
-                (l,r)=D[(i,j)]
-                value=value + l*M.z[(S,T),(i,j)] + (l+r)*M.w[(S,T),(i,j)]
-            value=value -M.s[(S,T)]
-            
-            return value >= M.m
     
-
-        M.STBlocks[(S,T)].c=Constraint(D.keys(),rule=C) #Distance-based shortest path
-        M.STBlocks[(S,T)].c0=Constraint(expr = M.d[(S,T),S]==0) #Distance-based shortest path
-        M.STBlocks[(S,T)].c1=Constraint(M.V, rule=c1) # R^Tw=t
-        M.STBlocks[(S,T)].c2=Constraint(expr= sum(M.t[(S,T),i]*M.t[(S,T),i] for i in M.V)<= M.s[(S,T)]*M.s[(S,T)]) # t^T t <= s^2
-        M.STBlocks[(S,T)].c3=Constraint(D.keys(),rule=c3) #zk + xk <= 1
-        M.STBlocks[(S,T)].c4=Constraint(D.keys(),rule=c4) #wk - xk <= 0
-        M.STBlocks[(S,T)].c5=Constraint(rule=c5)
-        M.STBlocks[(S,T)].c6=Constraint(N,rule=c6)
-        M.STBlocks[(S,T)].c7=Constraint(rule=c7)
+        value=0
+        for (i,j) in D.keys():
+            (l,r)=D[(i,j)]
+            value=value + l*M.STBlocks[(S,T)].z[(i,j)] + (l+r)*M.STBlocks[(S,T)].w[(i,j)]
+            value=value -M.STBlocks[(S,T)].s
+        M.STBlocks[(S,T)].c7=Constraint(expr=value >= M.m)
  
     return M
 
