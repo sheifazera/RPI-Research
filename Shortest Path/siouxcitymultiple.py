@@ -1,7 +1,18 @@
-#Sioux Falls Network
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jan 26 10:49:20 2021
+
+@author: sheifazera
+
+
+Sioux Falls with multiple sources and sinks, giving all paths in the result
+
+"""
+
 import numpy as np
+import time
 from pyomo.environ import *
-from shortestpath import create_shortest_path, create_shortest_path_robust_ellipsoid, return_path #, return_path_robust
+from shortestpath import path_length, adjusted_dictionary, create_shortest_path, create_asymmetric_uncertainty_shortest_path_interdiction, create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST, create_shortest_path_robust_ellipsoid,return_path_interdiction, return_path, create_shortest_path_interdiction, find_paths, find_paths_MST #, return_path_robust
 matrix = np.loadtxt('siouxfalls.txt', usecols=(0,1,3))
 #print(matrix) 
 
@@ -11,151 +22,12 @@ s=3
 t=20
 #print(D)
 
-# %%
-M=create_shortest_path(D,N,s,t)
-opt=SolverFactory('gurobi')
-results=opt.solve(M)
-M.pprint()
-path=return_path(M,D,N,s,t)
-#M.pprint()
+from prettytable import PrettyTable, ALL
 
-# %% Robust Sioux Falls
-udim=7
-N_disrupt={8,10,11,15,16,20,22}
-P={}
-i=0
-for n in N_disrupt: #for all nodes disrupted (uncertainty dimension)
-    for (u,v) in D.keys(): #check all edges 
-        if u==n or v==n: #edge enters the disrupted node 
-            P[(u,v,i)]=0.5*D[(u,v)] 
-        elif (u,n) in D.keys() or (v,n) in D.keys(): #u or v is adjacent to the disrupted node
-            P[(u,v,i)]=0.25*D[(u,v)]
-        else:
-            P[(u,v,i)]=0
-    i=i+1
-ME=create_shortest_path_robust_ellipsoid(D,N,P,s,t,udim)
-results_robust_ellipsoid=opt.solve(ME) #,tee=True)
-path_robust=return_path_robust(ME,D,N,P,s,t,udim)
-ME.pprint()
+timetable=PrettyTable()
+timetable.field_names=["Method", "Time to Run"]
 
-
-#%% Robust Sioux Falls with Certain Interdiction Addition
-B=2
-
-udim=7
-D = {(int(a),int(b)) : (c, 1000) for a,b,c in matrix}
-N_disrupt={8,10,11,15,16,20,22}
-P={}
-i=0
-for n in N_disrupt: #for all nodes disrupted (uncertainty dimension)
-    for (u,v) in D.keys(): #check all edges 
-        (l,r)=D[(u,v)]
-        if u==n or v==n: #edge enters the disrupted node 
-            P[(u,v,i)]=0.5*l 
-        elif (u,n) in D.keys() or (v,n) in D.keys(): #u or v is adjacent to the disrupted node
-            P[(u,v,i)]=0.25*l
-        else:
-            P[(u,v,i)]=0
-    i=i+1
-MI=create_shortest_path_robust_ellipsoid_certain_interdiction(D,N,P,s,t,udim, B)
-opt=SolverFactory('gurobi')
-results_interdiction=opt.solve(MI) #,tee=True)
-path_interdiction=return_path_interdiction_robust(MI,D,N,P,s,t,udim,opt)
-#MI.pprint()
-print('Robust Sioux Falls with Certain Interdiction Additions')
-MI.x.pprint()
-print(path_interdiction)
-
-# %% Robust Sioux Falls with Uncertain Interdiction Additions
-B=2
-
-udim=7
-D = {(int(a),int(b)) : (c, 0.5*c) for a,b,c in matrix}
-N_disrupt={8,10,11,15,16,20,22}
-P={}
-i=0
-for n in N_disrupt: #for all nodes disrupted (uncertainty dimension)
-    for (u,v) in D.keys(): #check all edges 
-        (l,r)=D[(u,v)]
-        if u==n or v==n: #edge enters the disrupted node 
-            P[(u,v,i)]=0.5*l
-        elif (u,n) in D.keys() or (v,n) in D.keys(): #u or v is adjacent to the disrupted node
-            P[(u,v,i)]=0.25*l
-        else:
-            P[(u,v,i)]=0
-    i=i+1
-vdim=3    
-R={}
-for i in range(0,vdim):
-    for (u,v) in D.keys(): #assign a value for all edges
-        if i==0:
-            if u in {1,2,3,4,5,6}:
-                R[(u,v,i)]=2
-            else:
-                R[(u,v,i)]=0
-        elif i==1:
-            if u in {7,8,9,20,11,12,16, 17, 18}:
-                R[(u,v,i)]=2
-            else:
-                R[(u,v,i)]=0
-        elif i==2:
-            if u in {13,14,15,19,20,21,22,23,24}:
-                R[(u,v,i)]=2
-            else:
-                R[(u,v,i)]=0
-
-    
-    
-MIU=create_shortest_path_robust_ellipsoid_uncertain_interdiction(D,N,P,R,s,t,udim,vdim, B)
-opt=SolverFactory('gurobi')
-results_interdiction_uncertain=opt.solve(MIU) #,tee=True)
-path_interdiction_uncertain=return_path_interdiction_robust_uncertain(MIU,D,N,P,R,s,t,udim,vdim,opt)
-#MIU.pprint()
-print('Robust Sioux Falls with Certain Interdiction Additions')
-MIU.x.pprint()
-MIU.v.pprint()
-print(path_interdiction_uncertain)
-
-
-
-# %% Asymmetric Uncertainty  
-
-
-D = {(int(a),int(b)) : (c, c) for a,b,c in matrix}
-B = 20
-vdim=len(D)
-R={}
-for (i,j) in D.keys():
-    (l,r)=D[(i,j)]
-    k=0
-    for (u,v) in D.keys():
-        if i==u and j==v:
-            R[(i,j,k)]=r
-        else:
-            R[(i,j,k)]=0
-        k=k+1
-
-s=3
-t=20
-
-M=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
-opt=SolverFactory('gurobi')
-results=opt.solve(M)
-print('Asymmetric Uncertainty Interdiction Results')
-print('Interdiction Variable')
-M.x.pprint()
-print('Evader Path Variable')
-M.w.pprint()
-M.z.pprint()
-print('Uncertainty Variable')
-M.t.pprint()
-path=return_path_asymmetric(M,D,N,s,t)
-print(path)
-print(f'Objective={value(M.Obj)}')
-print(f'd_t={M.d[t].value}')
-
-
-# %% Probability-based Sioux Falls
+# %% Shortest Path Interdiction with a Super Source
 Prob = {(int(a),int(b)) : c for a,b,c in matrix}
 for (i,j) in Prob.keys():
     if Prob[(i,j)] ==10:
@@ -199,8 +71,12 @@ for (i,j) in Prob.keys():
     
 B=5  
 M_SS=create_shortest_path_interdiction(D,N,s,t, B)   
+
 opt=SolverFactory('gurobi')
-results=opt.solve(M_SS) 
+start=time.time()
+results=opt.solve(M_SS)
+end=time.time() 
+timetable.add_row(['SS',end-start])
 path_SS=return_path_interdiction(M_SS,D,N,s,t,opt)    
 print('Interdiction')
 print('Interdiction Variable')
@@ -213,7 +89,7 @@ print(path_SS)
 print(f'Probability of Evasion={exp(-M_SS.d[t].value)}')    
 
 
-# %% Robust Super Source Sioux Falls
+# %% Robust Shortest Path Interdiction with a Super Source
 
 #Uncertainty
 
@@ -238,7 +114,10 @@ for (i,j) in D.keys():
 B=5
 M_SSR=create_asymmetric_uncertainty_shortest_path_interdiction(D,N,R,s,t,vdim,B)
 opt=SolverFactory('gurobi')
+start=time.time()
 results=opt.solve(M_SSR)
+end=time.time() 
+timetable.add_row(['SSR',end-start])
 print('Asymmetric Uncertainty Interdiction Results')
 print('Interdiction Variable')
 tol = 1e-4
@@ -253,13 +132,14 @@ for k in M_SSR.x.keys():
         print(M_SSR.z[k].getname(), M_SSR.z[k].value)
 #print('Uncertainty Variable')
 #M.t.pprint()
-path_SSR=return_path_asymmetric(M_SSR,D,N,s,t)
-print(path_SSR)
+(no_paths_SSR,path_SSR)=find_paths(M_SSR,D,N,s,t)
+for list in path_SSR:
+    print(list)
 print(f'Objective={value(M_SSR.Obj)}')
 print(f'Nominal Probability of Evasion={exp(-M_SSR.d[t].value)}')
 D_SSR=D      
 
-# %% Multiple (S,T) Pairs
+# %% Shortest Path Interdiction with Multiple (S,T) Pairs
 N=set(range(1,25))
 Prob = {(int(a),int(b)) : c for a,b,c in matrix}
 for (i,j) in Prob.keys():
@@ -303,7 +183,10 @@ R={}
 
 M_MST=create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B)
 opt=SolverFactory('gurobi')
+start=time.time()
 results=opt.solve(M_MST) 
+end=time.time() 
+timetable.add_row(['MST',end-start])
 #path=return_path_interdiction(M,D,N,s,t,opt)    
 print('Interdiction')
 print('Interdiction Variable')
@@ -313,11 +196,12 @@ for k in M_MST.x.keys():
         print(M_MST.x[k].getname(), M_MST.x[k].value)
 #print(path)
 for (S,T) in I:
-    path_MST=return_path_asymmetric_multiple_ST(M_MST,D,N,S,T)
-    print(f'Probability of Evasion on ({S},{T})={exp(-M_MST.STBlocks[(S,T)].d[T].value)}')    
-    print(path_MST)
+    (no_paths_MST,path_MST)=find_paths_MST(M_MST,D,N,S,T)
+    print(f'Probability of Evasion on ({S},{T})={exp(-M_MST.STBlocks[(S,T)].d[T].value)}')  
+    for list in path_MST:
+        print(list)
     
-# %%  Robust Multiple ST Pairs
+# %%  Robust Shortest Path Interdiction with Multiple (S,T) Pairs
 Prob = {(int(a),int(b)) : c for a,b,c in matrix}
 for (i,j) in Prob.keys():
     if Prob[(i,j)] ==10:
@@ -373,7 +257,10 @@ for (i,j) in D.keys():
 
 M_MSTR=create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I,vdim,B)
 opt=SolverFactory('gurobi')
+start=time.time()
 results=opt.solve(M_MSTR) 
+end=time.time() 
+timetable.add_row(['MSTR',end-start])
 #path=return_path_interdiction(M,D,N,s,t,opt)    
 print('Interdiction')
 print('Interdiction Variable')
@@ -381,55 +268,92 @@ tol = 1e-4
 for k in M_MSTR.x.keys():
     if abs(M_MSTR.x[k].value)>tol:
         print(M_MSTR.x[k].getname(), M_MSTR.x[k].value)
-
 for (S,T) in I:
-    path=return_path_asymmetric_multiple_ST(M_MSTR,D,N,S,T)
+    (no_paths_MSTR, path)=find_paths_MST(M_MSTR,D,N,S,T)
     print(f'Probability of Evasion on ({S},{T})={exp(-M_MSTR.STBlocks[(S,T)].d[T].value)}')    
-    print(path)
+    for list in path:
+        print(list)
 
 
 
 # %% Getting a pretty table for comparison
 
-from prettytable import PrettyTable
+from prettytable import PrettyTable, ALL
 
 table=PrettyTable()
+table.hrules=ALL
 table.field_names=["(S,T)", "SS SP", "SS Prob", "SSR SP", "SSR Nom Prob", "SSR Robust Prob", "MST SP", "MST Prob", "MSTR SP", "MSTR Nom Prob", "MSTR Robust Prob"]
+
 for (S,T) in I:
+    
+    #Shortest Path Interdiction with a Super Source (currently does not support multiple paths)
     if S in path_SS:
         SS1=path_SS
         SS2=exp(-M_SS.d[t].value)
     else:
          SS1="NA"
          SS2= "NA"
-         
-    if S in path_SSR: 
-        SSR1=path_SSR
-        SSR2=exp(-M_SSR.d[t].value)
-        D_adj=adjusted_dictionary(M_SSR,D_SSR,R,S,T)
-        SSR3=exp(-path_length(M_SSR,path_SSR,D_adj,S,T))
-        #SSR3=exp(-(M_SSR.Obj.expr())) #THIS IS PROBABLY WRONG if there are multiple paths
-    else: 
-        SSR1="N/A"
-        SSR2= "N/A"
-        SSR3="N/A"
-    path_MST=return_path_asymmetric_multiple_ST(M_MST,D,N,S,T)
-    path_MSTR=return_path_asymmetric_multiple_ST(M_MSTR,D,N,S,T)
-    '''
-    evad=0
-    for (i,j) in D.keys():
-        (l,r)=D[(i,j)]
-        evad=evad + l*M_MSTR.STBlocks[(S,T)].z[(i,j)].value + (l+r)*M_MSTR.STBlocks[(S,T)].w[(i,j)].value
     
-    evad=evad - sum(M_MSTR.STBlocks[(S,T)].t[i].value*M_MSTR.STBlocks[(S,T)].t[i].value for i in M_MSTR.V)
-    '''
-    #Fix these two to work with M.STBlocks[(S,T)].t etc etc 
+    # Robust Shortest Path Interdiction with a Super Source
+    SSR1=[]
+    SSR2=[]
+    SSR3=[]
+    for path in path_SSR:     
+        if S in path: 
+            path_str=[]
+            for i in path:
+                path_str.append(str(i))
+            path_str="-".join(path_str)
+            SSR1.append(path_str)
+            SSR2.append(str(exp(-M_SSR.d[t].value)))
+            D_adj=adjusted_dictionary(M_SSR,D_SSR,R,S,T)
+            SSR3.append(str(exp(-path_length(M_SSR,path,D_adj,S,T))))
+               
+    SSR1="\n".join(SSR1)
+    SSR2="\n".join(SSR2)
+    SSR3="\n".join(SSR3) 
+    (no_of_path_MST, path_MST)=find_paths_MST(M_MST,D,N,S,T)
+    
+    MST1=[]
+    MST2=[]
+    for path in path_MST:
+        path_str=[]
+        for i in path:
+            path_str.append(str(i))
+        path_str="-".join(path_str)
+        MST1.append(path_str)
+        
+        MST2.append(str(exp(-M_MST.STBlocks[(S,T)].d[T].value)))
+        
+    MST1="\n".join(MST1) 
+    MST2="\n".join(MST2)
+    (no_of_path_MSTR, path_MSTR)=find_paths_MST(M_MSTR,D,N,S,T)   
     D_adj=adjusted_dictionary(M_MSTR,D,R,S,T)
-    evad=path_length(M_MSTR,path_MSTR,D_adj,S,T)
+    MSTR1=[]
+    MSTR2=[]
+    MSTR3=[]
+    for path in path_MSTR:
+        path_str=[]
+        for i in path:
+            path_str.append(str(i))
+        path_str="-".join(path_str)
+        MSTR1.append(path_str)
+        
+        MSTR2.append(str(exp(-M_MSTR.STBlocks[(S,T)].d[T].value)))
+        
+        
+        evad=path_length(M_MSTR,path,D_adj,S,T)
+        MSTR3.append(str(exp(-evad)))
+    MSTR1="\n".join(MSTR1)    
+    MSTR2="\n".join(MSTR2)    
+    MSTR3="\n".join(MSTR3)    
     
-    table.add_row([(S,T), SS1, SS2, SSR1, SSR2, SSR3,path_MST,exp(-M_MST.STBlocks[(S,T)].d[T].value), path_MSTR,exp(-M_MSTR.STBlocks[(S,T)].d[T].value), exp(-evad)])
+    
+    table.add_row([(S,T), SS1, SS2, SSR1, SSR2, SSR3,MST1,MST2, MSTR1,MSTR2, MSTR3])
 
 
 print(f'Budget={B}')
 print(table)
+
+print(timetable)
 

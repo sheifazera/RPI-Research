@@ -481,16 +481,206 @@ def create_asymmetric_uncertainty_shortest_path_interdiction_multiple_ST(D,N,R,I
         for (i,j) in D.keys():
             (l,r)=D[(i,j)]
             value=value + l*M.STBlocks[(S,T)].z[(i,j)] + (l+r)*M.STBlocks[(S,T)].w[(i,j)]
-            value=value -M.STBlocks[(S,T)].s
+        value=value -M.STBlocks[(S,T)].s
         M.STBlocks[(S,T)].c7=Constraint(expr=value >= M.m)
  
     return M
 
 
+def path_length(M,path,D,S,T):
+    path_length=0
+    for i in range(len(path)-1):
+        path_length=path_length+ D[(path[i], path[i+1])]
+    return path_length
 
+def adjusted_dictionary(M,D,R,S,T):
+    tol = 1e-5
+    D_adj={}
+    if hasattr(M,'t'):
+        norm=np.sqrt(sum(M.t[i].value*M.t[i].value for i in M.V))
+        
+        for (i,j) in D:  
+            (l,r)=D[(i,j)]
+            D_adj[(i,j)]=l
+            if M.x[(i,j)].value >= 0.9: # Tune this cut off value
+                D_adj[(i,j)]=D_adj[(i,j)]+r
+                if norm>tol:
+                    adjustment=(-1/norm)*(sum(R[(i,j,k-1)]*M.t[k].value for k in M.V))
+                    if r+ adjustment < 0:
+                        raise Exception ('Robust interdiction adjustment reduces the length lower than the base length')
+                    else:
+                        D_adj[(i,j)]=D_adj[(i,j)]+ adjustment
+    else:
+        norm=np.sqrt(sum(M.STBlocks[(S,T)].t[i].value*M.STBlocks[(S,T)].t[i].value for i in M.V))
+        
+        for (i,j) in D:  
+            (l,r)=D[(i,j)]
+            D_adj[(i,j)]=l
+            if M.x[(i,j)].value >= 0.9:
+                D_adj[(i,j)]=D_adj[(i,j)]+r
+                if norm>tol: # Tune this cut off value
+                    adjustment=(-1/norm)*(sum(R[(i,j,k-1)]*M.STBlocks[(S,T)].t[k].value for k in M.V))
+                    if r+ adjustment < 0: 
+                        raise Exception ('Robust interdiction adjustment reduces the length lower than the base length')
+                    else:
+                        D_adj[(i,j)]=D_adj[(i,j)]+ adjustment
+    return D_adj
+        
+        
+def find_paths_MST(M,D,N,s,t):
+    no_of_paths=0
+    paths=[]
+    
+    tol=1/max(N)
+    
+    #first path
+    N_in_path=[s]
+    n=s
+    nold=infty
+    while (n != t):
+        if n==nold: #If we went through the loop without finding an adjacent node
+            raise Exception('False path: no adjacent node has positive dual value!')
+        for j in N-set(N_in_path): 
+            if (n,j) in D.keys():
+                if M.STBlocks[(s,t)].z[(n,j)].value >tol or M.STBlocks[(s,t)].w[(n,j)].value >tol:
+                    N_in_path.append(j)
+                    nold=n
+                    n=j
+                    break   
+    paths.append(N_in_path)
+    no_of_paths=+1
+    more_paths_flag=0
+    
+    #check for more paths
+    for (i,j) in D.keys(): #Are there any links 
+        if M.STBlocks[(s,t)].z[(i,j)].value >tol or M.STBlocks[(s,t)].w[(i,j)].value >tol:
+            if (i not in N_in_path):
+                more_paths_flag=1
+                missing_link=(i,j)
+                break
+            if (j not in N_in_path):
+                more_paths_flag=1
+                missing_link=(i,j)
+                break
+     
+    while more_paths_flag==1:
+         N_in_path=[i]
+         N_in_path.append(j)
+         n=j
+         nold=i
+         while (n!=t):
+             if n==nold:
+                 raise Exception('False path: no adjacent node has positive dual value!')
+             for k in N-set(N_in_path):
+                 if (n,k) in D.keys():
+                     if M.STBlocks[(s,t)].z[(n,k)].value >tol or M.STBlocks[(s,t)].w[(n,k)].value >tol:
+                         N_in_path.append(k)
+                         nold=n
+                         n=k
+                         break
+         n=i
+         nold=j
+         while (n!=s):
+             if n==nold:
+                  raise Exception('False path: no adjacent node has positive dual value!')
+             for k in N-set(N_in_path):
+                 if (k,n) in D.keys():
+                     if M.STBlocks[(s,t)].z[(k,n)].value >tol or M.STBlocks[(s,t)].w[(k,n)].value >tol:
+                         N_in_path.insert(0, k)
+                         nold=n
+                         n=k 
+                         break
+         paths.append(N_in_path)
+         more_paths_flag=0
+         for (i,j) in D.keys(): #Are there any links 
+             if M.STBlocks[(s,t)].z[(i,j)].value >tol or M.STBlocks[(s,t)].w[(i,j)].value >tol:
+                 if any(i in list for list in paths)==False:
+                     more_paths_flag=1
+                     missing_link=(i,j)
+                     break
+                 if any(j in list for list in paths)==False:
+                     more_paths_flag=1
+                     missing_link=(i,j)
+                     break
+    
+    
+    return (no_of_paths,paths)
 
-
-
+def find_paths(M,D,N,s,t):
+    no_of_paths=0
+    paths=[]
+    
+    tol=1/max(N)
+    
+    #first path
+    N_in_path=[s]
+    n=s
+    nold=infty
+    while (n != t):
+        if n==nold: #If we went through the loop without finding an adjacent node
+            raise Exception('False path: no adjacent node has positive dual value!')
+        for j in N-set(N_in_path): 
+            if (n,j) in D.keys():
+                if M.z[(n,j)].value >tol or M.w[(n,j)].value >tol:
+                    N_in_path.append(j)
+                    nold=n
+                    n=j
+                    break   
+    paths.append(N_in_path)
+    no_of_paths=+1
+    more_paths_flag=0
+    
+    #check for more paths
+    for (i,j) in D.keys(): #Are there any links 
+        if M.z[(i,j)].value >tol or M.w[(i,j)].value >tol:
+            if (i not in N_in_path):
+                more_paths_flag=1
+                missing_link=(i,j)
+                break
+            if (j not in N_in_path):
+                more_paths_flag=1
+                missing_link=(i,j)
+                break
+     
+    while more_paths_flag==1:
+         N_in_path=[missing_link]
+         n=j
+         nold=i
+         while (n!=t):
+             if n==nold:
+                 raise Exception('False path: no adjacent node has positive dual value!')
+             for k in N-set(N_in_path):
+                 if (n,k) in D.keys():
+                     if M.z[(n,k)].value >tol or M.w[(n,k)].value >tol:
+                         N_in_path.append(k)
+                         nold=n
+                         n=k
+                         break
+         while (n!=s):
+             if n==nold:
+                  raise Exception('False path: no adjacent node has positive dual value!')
+             for k in N-set(N_in_path):
+                 if (k,n) in D.keys():
+                     if M.z[(k,n)].value >tol or M.w[(k,n)].value >tol:
+                         N_in_path.insert(0, k)
+                         nold=n
+                         n=k 
+                         break
+         paths.append(N_in_path)
+         more_paths_flag=0
+         for (i,j) in D.keys(): #Are there any links 
+             if M.z[(i,j)].value >tol or M.w[(i,j)].value >tol:
+                 if any(i in list for list in paths)==False:
+                     more_paths_flag=1
+                     missing_link=(i,j)
+                     break
+                 if any(j in list for list in paths)==False:
+                     more_paths_flag=1
+                     missing_link=(i,j)
+                     break
+    
+    
+    return (no_of_paths,paths)
 
 
 
