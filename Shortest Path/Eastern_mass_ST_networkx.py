@@ -353,3 +353,174 @@ ax.set_ylabel('Number Similar Length Paths (10%)')
 ax.set_xlabel('Nodes in Shortest Path')
 ax.set_title('Number of Similar Length Paths and Nodes in Shortest Path')
 plt.colorbar()
+
+
+
+
+#%% Multivariate Regression
+import pandas as pd
+
+from sklearn import linear_model
+
+from scipy.stats import pearsonr
+
+
+
+pickle_off = open("ST_data_with_similar","rb")
+data = pickle.load(pickle_off)
+k=0
+data_array=np.zeros(shape=(2701,4))
+for (S,T) in data.keys():
+    (_,_,_,t,_,l,n,s)=data[(S,T)]
+    data_array[k]=np.array([t,l,n,s])
+    k=k+1
+    
+#data_array = np.array([list(v) for v in data.values()])
+X=pd.DataFrame(data_array[:,1:4], columns=['Path_Length','Nodes_in_Path', 'Similar_Paths'])
+y=pd.DataFrame(data_array[:,0], columns=['Solve_Time'])
+
+#%%                                           
+regr = linear_model.LinearRegression()
+model=regr.fit(X, y)
+response = model.predict(X)
+r2=model.score(X,y)
+
+
+print(regr.coef_)  
+print(r2) 
+
+X.corr
+
+
+# Path_Length
+X_path=pd.DataFrame(data_array[:, 1], columns=['Path_Length'])
+
+regr_path=linear_model.LinearRegression()
+model=regr_path.fit(X_path,y)
+response= model.predict(X_path)
+r2=model.score(X_path,y)   
+print('Path Length vs Solve Time')
+print(regr_path.coef_)
+print(r2) 
+
+plt.style.use('default')
+plt.style.use('ggplot')
+
+fig, ax = plt.subplots(figsize=(8, 4))
+
+ax.plot(X_path, response, color='k', label='Regression model')
+ax.scatter(X_path, y, edgecolor='k', facecolor='grey', alpha=0.7, label='Sample data')
+ax.set_ylabel('Solve Time (s)', fontsize=14)
+ax.set_xlabel('Path Length', fontsize=14)
+ax.legend(facecolor='white', fontsize=11)
+ax.set_title('$R^2= %.2f$' % r2, fontsize=18)
+
+fig.tight_layout()
+
+#Similar Paths
+X_sim=pd.DataFrame(data_array[:,3], columns=['Similar_Paths'])
+
+regr_sim=linear_model.LinearRegression()
+model=regr_path.fit(X_sim,y)
+response= model.predict(X_sim)
+r2=model.score(X_sim,y)   
+print('Number of Similar Paths vs Solve Time')
+print(regr_path.coef_)
+print(r2)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+
+ax.plot(X_sim, response, color='k', label='Regression model')
+ax.scatter(X_sim, y, edgecolor='k', facecolor='grey', alpha=0.7, label='Sample data')
+ax.set_ylabel('Solve Time (s)', fontsize=14)
+ax.set_xlabel('Number of Similar Paths', fontsize=14)
+ax.legend(facecolor='white', fontsize=11)
+ax.set_title('$R^2= %.2f$' % r2, fontsize=18)
+                         
+
+
+#%% Let's try this with a log transformation on the times first?
+X=pd.DataFrame(data_array[:,1:4], columns=['Path_Length','Nodes_in_Path', 'Similar_Paths'])
+y=pd.DataFrame(np.log(data_array[:,0]), columns=['Solve_Time'])
+                                          
+regr = linear_model.LinearRegression()
+model=regr.fit(X, y)
+response = model.predict(X)
+r2=model.score(X,y)
+
+print('Log Transform to the y axis first')
+print(regr.coef_)  
+print(r2) 
+
+
+plt.style.use('default')
+plt.style.use('ggplot')
+
+fig, ax = plt.subplots(figsize=(8, 4))
+
+ax.plot(X_path, response, color='k', label='Regression model')
+ax.scatter(X_path, y, edgecolor='k', facecolor='grey', alpha=0.7, label='Sample data')
+ax.set_ylabel('Log Solve Time (s)', fontsize=14)
+ax.set_xlabel('Path Length', fontsize=14)
+ax.legend(facecolor='white', fontsize=11)
+ax.set_title('$R^2= %.2f$' % r2, fontsize=18)
+
+fig.tight_layout()
+
+#Similar Paths
+X_sim=pd.DataFrame(data_array[:,3], columns=['Similar_Paths'])
+
+regr_sim=linear_model.LinearRegression()
+model=regr_path.fit(X_sim,y)
+response= model.predict(X_sim)
+r2=model.score(X_sim,y)   
+print('Number of Similar Paths vs Solve Time')
+print(regr_path.coef_)
+print(r2)
+
+fig, ax = plt.subplots(figsize=(8, 4))
+
+ax.plot(X_sim, response, color='k', label='Regression model')
+ax.scatter(X_sim, y, edgecolor='k', facecolor='grey', alpha=0.7, label='Sample data')
+ax.set_ylabel('Log Solve Time (s)', fontsize=14)
+ax.set_xlabel('Number of Similar Paths', fontsize=14)
+ax.legend(facecolor='white', fontsize=11)
+ax.set_title('$R^2= %.2f$' % r2, fontsize=18)
+
+#%% Classification
+
+from sklearn import svm
+X=np.transpose(np.vstack([data_array[:,1],data_array[:,3]]))
+
+yclass=np.zeros(shape=(2701,1))
+for k in range(0,2701):
+    t=data_array[k,0]
+    if t>=1:
+        yclass[k]=1
+    else:
+        yclass[k]=0
+
+y0=pd.DataFrame(yclass, columns=['Bad_Good'])
+plt.scatter(data_array[:,1],data_array[:,3], c=yclass, cmap=plt.cm.Paired, edgecolors='k')
+
+clf=svm.SVC(kernel='linear', class_weight={1:2})
+
+clf.fit(X,np.ravel(yclass))
+
+ax=plt.gca()
+xlim=ax.get_xlim()
+ylim=ax.get_ylim()
+xx=np.linspace(xlim[0], xlim[1], 30)
+yy=np.linspace(ylim[0], ylim[1], 30)
+YY, XX =np.meshgrid(yy,xx)
+xy=np.vstack([XX.ravel(), YY.ravel()]).T
+
+Z=clf.predict(xy).reshape(XX.shape)
+
+a=ax.contour(XX, YY, Z, colors='k', levels=[0], alpha=0.5, linestyles=['-'])
+
+
+#%%
+#plt.contourf(data_array[:,1], data_array[:,3],data_array[:,0] )
+plt.scatter(data_array[:,1], data_array[:,3], c=data_array[:,0], marker=".")
+plt.colorbar()

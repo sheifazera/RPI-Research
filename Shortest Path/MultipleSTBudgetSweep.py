@@ -53,7 +53,7 @@ Prob=None
 I=set(it.combinations(list(G.nodes),2))
 
 
-Budgets={5,10,15,20,25,30,35,40}
+Budgets={5,10,15,20}
 
 #%%
 data_time_array=np.empty([8,4,10])
@@ -175,10 +175,10 @@ pickle_off = open("Budget_MST_prob_d","rb")
 data_prob_d_array=pickle.load(pickle_off)
 
 
-data_avg_e=np.empty([8,4])
-data_avg_d=np.empty([8,4])
+data_avg_e=np.empty([4,4])
+data_avg_d=np.empty([4,4])
 
-B_label=np.array([5,10,15,20,25,30,35,40])
+B_label=np.array([5,10,15,20])
 for k in range(0,10):
     plt.figure()
     plt.plot(B_label, np.exp(-data_prob_e_array[:,0,k]), label = "2 (S,T) Pairs")

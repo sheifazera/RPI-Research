@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Feb 17 10:20:35 2021
-
 @author: sheifazera
 """
 
@@ -232,6 +231,8 @@ def return_paths(M,G,R,S,T):
             G_adj.add_edge(i,j,adjusted_length=length)
     #Finished creating a network with only edges that are traversed in the problem with adjusted edges lengths
     #Use Network_X to find ALL shortest paths
+    #print(G_adj[3][342]['adjusted_length'])
+    #print(G_adj[3][352]['adjusted_length'])
     paths=nx.all_shortest_paths(G_adj, source=S, target=T, weight='adjusted_length')
     paths=list(paths)
     lengths=nx.shortest_path_length(G_adj, source=S, target=T, weight='adjusted_length', method='dijkstra')
@@ -301,5 +302,3 @@ def similar_length(M,G,R,S,T,cutoff): #cutoff=percentage of shortest path longer
             break
     no_of_similar_paths=len(similar_paths)
     return (similar_paths, no_of_similar_paths)
-    
-    
